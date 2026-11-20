@@ -1,0 +1,6 @@
+#!/bin/sh
+echo "fastboot $@" >> "${FAKE_LOG:-/dev/null}"
+case "$*" in
+  devices) printf 'FB123456\tfastboot\n' ;;
+  *) : ;;
+esac

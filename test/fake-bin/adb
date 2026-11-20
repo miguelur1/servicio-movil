@@ -1,0 +1,13 @@
+#!/bin/sh
+echo "$@" >> "${FAKE_LOG:-/dev/null}"
+case "$*" in
+  "devices -l") printf 'List of devices attached\nR58M12ABCDE device usb:1-1 product:x model:SM_G973F device:beyond1 transport_id:3\n' ;;
+  *"shell getprop") printf '[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-G973F]\n[ro.build.version.release]: [12]\n[ro.build.version.sdk]: [31]\n[ro.boot.flash.locked]: [1]\n' ;;
+  *"shell dumpsys battery") printf '  level: 64\n  scale: 100\n  status: 3\n  health: 2\n  temperature: 305\n' ;;
+  *"shell df -k /data") printf 'Filesystem 1K-blocks Used Available Use%% Mounted on\n/dev/block/dm-0 1000 400 600 40%% /data\n' ;;
+  *"exec-out screencap -p") printf '\211PNG\r\n\032\nFAKEDATA' ;;
+  *"logcat -d"*) printf '11-20 10:00:00.000 I/Test( 1): hola\n' ;;
+  *"reboot"*) : ;;
+  *"install -r"*) echo "Performing Streamed Install"; echo "Success" ;;
+  *) echo "adb falso: $*" >&2; exit 1 ;;
+esac

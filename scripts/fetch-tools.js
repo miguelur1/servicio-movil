@@ -1,0 +1,85 @@
+'use strict';
+// Descarga los binarios oficiales que se empaquetan con el instalador de Windows:
+//  - Android SDK Platform-Tools (Google): adb.exe, fastboot.exe
+//  - libimobiledevice para Windows (proyecto libimobiledevice-win32/imobiledevice-net)
+// Uso: npm run fetch-tools
+const fs = require('node:fs');
+const path = require('node:path');
+const https = require('node:https');
+const { execFileSync } = require('node:child_process');
+
+const BIN = path.join(__dirname, '..', 'resources', 'bin');
+const CACHE = path.join(__dirname, '..', '.cache');
+const PLATFORM_TOOLS = 'https://dl.google.com/android/repository/platform-tools-latest-windows.zip';
+const IMD_RELEASES = 'https://api.github.com/repos/libimobiledevice-win32/imobiledevice-net/releases?per_page=10';
+
+function get(url, { json = false, redirects = 5 } = {}) {
+  return new Promise((resolve, reject) => {
+    const headers = { 'User-Agent': 'servicio-movil-build' };
+    if (process.env.GITHUB_TOKEN && url.includes('api.github.com')) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    https.get(url, { headers }, (res) => {
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location && redirects > 0) {
+        res.resume();
+        return resolve(get(new URL(res.headers.location, url).toString(), { json, redirects: redirects - 1 }));
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error(`${url} → HTTP ${res.statusCode}`)); }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        resolve(json ? JSON.parse(buf.toString('utf8')) : buf);
+      });
+    }).on('error', reject);
+  });
+}
+
+function unzip(zip, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  if (process.platform === 'win32') {
+    execFileSync('powershell.exe', ['-NoProfile', '-Command', 'Expand-Archive', '-LiteralPath', zip, '-DestinationPath', dest, '-Force'], { stdio: 'inherit' });
+  } else {
+    execFileSync('unzip', ['-o', '-q', zip, '-d', dest], { stdio: 'inherit' });
+  }
+}
+
+async function download(url, name) {
+  fs.mkdirSync(CACHE, { recursive: true });
+  const file = path.join(CACHE, name);
+  console.log(`↓ ${url}`);
+  fs.writeFileSync(file, await get(url));
+  return file;
+}
+
+async function platformTools() {
+  const zip = await download(PLATFORM_TOOLS, 'platform-tools.zip');
+  fs.rmSync(path.join(BIN, 'platform-tools'), { recursive: true, force: true });
+  unzip(zip, BIN); // el zip ya contiene la carpeta platform-tools/
+  if (!fs.existsSync(path.join(BIN, 'platform-tools', 'adb.exe'))) throw new Error('adb.exe no está en el zip de platform-tools');
+}
+
+async function libimobiledevice() {
+  const releases = await get(IMD_RELEASES, { json: true });
+  let asset = null;
+  for (const r of releases) {
+    asset = (r.assets || []).find((a) => /win-x64\.zip$/i.test(a.name));
+    if (asset) { console.log(`libimobiledevice: ${r.tag_name} (${asset.name})`); break; }
+  }
+  if (!asset) throw new Error('No se encontró un build win-x64 de libimobiledevice');
+  const zip = await download(asset.browser_download_url, 'libimobiledevice.zip');
+  const dest = path.join(BIN, 'libimobiledevice');
+  fs.rmSync(dest, { recursive: true, force: true });
+  unzip(zip, dest);
+  // Algunos zips traen una subcarpeta: aplanar si idevice_id.exe no está en la raíz.
+  if (!fs.existsSync(path.join(dest, 'idevice_id.exe'))) {
+    const sub = fs.readdirSync(dest).map((d) => path.join(dest, d)).find((d) => fs.existsSync(path.join(d, 'idevice_id.exe')));
+    if (!sub) throw new Error('idevice_id.exe no está en el zip de libimobiledevice');
+    for (const f of fs.readdirSync(sub)) fs.renameSync(path.join(sub, f), path.join(dest, f));
+    fs.rmSync(sub, { recursive: true, force: true });
+  }
+}
+
+(async () => {
+  await platformTools();
+  await libimobiledevice();
+  console.log(`✓ Herramientas listas en ${BIN}`);
+})().catch((e) => { console.error(`✗ ${e.message}`); process.exit(1); });

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <title>Servicio Móvil</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Servicio Móvil</h1>
+    <div id="update" class="update" hidden></div>
+    <span id="version" class="muted"></span>
+  </header>
+  <main>
+    <aside>
+      <div class="aside-head">
+        <h2>Dispositivos</h2>
+        <button id="refresh" title="Buscar de nuevo">Actualizar</button>
+      </div>
+      <ul id="devices"></ul>
+      <p id="empty" class="muted">Conecta un teléfono por USB. En Android activa «Depuración USB»; en iPhone pulsa «Confiar».</p>
+      <details id="toolsBox">
+        <summary>Herramientas</summary>
+        <ul id="tools"></ul>
+      </details>
+    </aside>
+    <section id="detail">
+      <p class="muted">Selecciona un dispositivo.</p>
+    </section>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>
