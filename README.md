@@ -27,11 +27,12 @@ Compatible con cualquier Android con ADB (Samsung, Xiaomi, Motorola… y **Googl
 | Explorador de archivos | ✓ almacenamiento del teléfono | ✓ archivos de la copia (WhatsApp, notas, apps…) |
 | Diagnóstico por piezas (pantalla, táctil, cámaras, sensores, huella, Wi-Fi, Bluetooth, NFC, módem, SIM, GPS, memoria, carga) | ✓ + pruebas manuales (vibración, táctil, cámaras) | ✓ módem, SIM, Wi-Fi, Bluetooth, proximidad y reinicios (panics) con la pieza probable |
 | Análisis del registro: fallos, apps que se cierran, reinicios y qué revisar | ✓ logcat, historial de fallos y motivo del último reinicio | ✓ syslog e informes de fallo (sin borrarlos) |
-| Salud de batería (ciclos, capacidad real vs. diseño) e informe para el cliente | ✓ (si el fabricante la expone) | ✓ |
+| Salud de batería (ciclos, capacidad real vs. diseño) | ✓ (si el fabricante la expone) | ✓ |
 | Gestor de apps: ver, instalar, desinstalar, copiar | ✓ APK/split APK; desactivar y recuperar apps del sistema | ✓ IPA firmados para el dispositivo (ideviceinstaller) |
 | Pasar datos de un móvil a otro (los dos conectados) | Android→Android: fotos, archivos, contactos, apps | iPhone→Android: fotos y contactos · iPhone→iPhone: copia completa. Android→iPhone: Apple no lo permite por cable (se indica «Pasar a iOS») |
 | Imagen del dispositivo: silueta por modelo, pantalla en directo y foto propia | ✓ | ✓ (pantalla en directo: iOS 17+ requiere modo desarrollador) |
-| Reparación: guías paso a paso y problemas típicos (iFixit, CC BY-NC-SA), búsqueda de esquemas en tus sitios, biblioteca propia por modelo | ✓ | ✓ |
+| Reparación: lista de reparaciones (recomendadas por el diagnóstico) y guía paso a paso con fotos (iFixit, CC BY-NC-SA, en español si hay traducción); manuales oficiales, búsqueda de esquemas en tus sitios y biblioteca propia por modelo | ✓ | ✓ |
+| Informe para el cliente en PDF (dispositivo, batería, piezas, análisis del registro) y compartir: WhatsApp, correo, copiar, guardar o pasar al móvil | ✓ | ✓ (pasar al móvil: solo Android) |
 | Instalar APK, reiniciar a recovery/fastboot | ✓ | — |
 | Auto-actualización desde GitHub Releases | ✓ | ✓ |
 

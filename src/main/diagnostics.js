@@ -97,7 +97,7 @@ function batteryVerdict(b) {
 // ── Informe ─────────────────────────────────────────────────────────────────
 const esc = (s) => String(s ?? '—').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function reportHtml(info, battery, { taller = 'MVR Servicio Móvil', fecha = new Date() } = {}) {
+function reportHtml(info, battery, { taller = 'MVR Servicio Móvil', fecha = new Date(), components = null, analysis = null } = {}) {
   const ios = info.platform === 'ios';
   const rows = ios ? [
     ['Dispositivo', info.marketName], ['Nombre', info.name], ['Modelo', info.model], ['Nº de modelo', info.modelNumber], ['iOS', `${info.iosVersion || '—'} (${info.buildId || '—'})`],
@@ -123,15 +123,32 @@ function reportHtml(info, battery, { taller = 'MVR Servicio Móvil', fecha = new
 h1{font-size:22px;margin:0}h2{font-size:16px;margin:24px 0 8px;border-bottom:2px solid #111;padding-bottom:4px}
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #ddd}th{width:45%;font-weight:600;color:#444}
 .v{padding:10px 12px;border-radius:6px;margin-top:10px;font-weight:600}.ok{background:#dcfce7}.warn{background:#fef9c3}.bad{background:#fee2e2}.unknown{background:#f3f4f6}
-.meta{color:#666}.firma{margin-top:48px;display:flex;gap:48px}.firma div{flex:1;border-top:1px solid #999;padding-top:6px;color:#666}
+.st{font-weight:600;white-space:nowrap}.st.ok{color:#166534;background:none}.st.warn{color:#92400e;background:none}.st.bad{color:#991b1b;background:none}.st.info{color:#555}
+li{margin:4px 0}.meta{color:#666}.firma{margin-top:48px;display:flex;gap:48px}.firma div{flex:1;border-top:1px solid #999;padding-top:6px;color:#666}
 @media print{body{margin:0}}</style></head><body>
 <h1>Informe de estado del dispositivo</h1>
 <div class="meta">${esc(taller)} · ${esc(fecha.toLocaleString('es-ES'))}</div>
 <h2>Dispositivo</h2>${table(rows)}
 <h2>Batería</h2>${table(brow)}<div class="v ${v.level}">${esc(v.text)}</div>
-<div class="firma"><div>Firma del técnico</div><div>Firma del cliente</div></div>
+${partsHtml(components)}${analysisHtml(analysis)}<div class="firma"><div>Firma del técnico</div><div>Firma del cliente</div></div>
 <p class="meta" style="margin-top:32px;font-size:12px">MVR Servicio Móvil · Desarrollado por Miguel Velasco Rebollo</p>
 </body></html>`;
+}
+
+const STATUS_TXT = { ok: 'OK', warn: 'Revisar', bad: 'Fallo', info: 'Prueba manual' };
+function partsHtml(list) {
+  if (!Array.isArray(list) || !list.length) return '';
+  return `<h2>Estado de las piezas</h2><table>${list.map((c) => `<tr><th>${esc(c.name)}</th><td>${c.status === 'info' ? '' : `<span class="st ${esc(c.status)}">${esc(STATUS_TXT[c.status] || c.status)}</span> · `}${esc(c.detail)}</td></tr>`).join('')}</table>`;
+}
+const SEV_TXT = { alta: 'Grave', media: 'Media', baja: 'Leve' };
+function analysisHtml(a) {
+  if (!a || !Array.isArray(a.findings)) return '';
+  const cls = a.verdict === 'bad' ? 'bad' : a.verdict === 'warn' ? 'warn' : 'ok';
+  return `<h2>Análisis del registro del sistema</h2><div class="v ${cls}">${esc(a.summary)}</div>${a.findings.length ? `<ul>${a.findings.map((f) => `<li><b>${esc(SEV_TXT[f.sev] || f.sev)}: ${esc(f.title)}</b>${f.count > 1 ? ` (${f.count} veces)` : ''}. ${esc(f.explain)} <i>Qué revisar:</i> ${esc(f.fix)}</li>`).join('')}</ul>` : ''}`;
+}
+
+function reportName(info, ext) {
+  return `informe-${String(info.marketName || info.model || info.name || 'dispositivo').replace(/[^\w.-]+/g, '_')}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.${ext}`;
 }
 
 function saveReport(dir, info, battery) {
@@ -148,4 +165,4 @@ async function restartAdb() {
   return true;
 }
 
-module.exports = { iosBattery, androidBattery, iosBatteryFromIoreg, androidBatteryFromSys, batteryVerdict, reportHtml, saveReport, restartAdb, SYS_CMD };
+module.exports = { reportName, iosBattery, androidBattery, iosBatteryFromIoreg, androidBatteryFromSys, batteryVerdict, reportHtml, saveReport, restartAdb, SYS_CMD };

@@ -50,7 +50,7 @@ test('deviceInfo: encuentra el modelo probando variantes y ordena guías', async
   repair.setFetch(fakeFetch({ [`/wikis/CATEGORY/${encodeURIComponent('Xiaomi Redmi Note 11 Pro 5G')}`]: WIKI }, calls));
   const r = await repair.deviceInfo('Redmi Note 11 Pro 5G');
   assert.strictEqual(r.found, true);
-  assert.deepStrictEqual(r.guides.map((g) => g.kind), ['screen', 'battery', 'camera']);
+  assert.deepStrictEqual(r.guides.map((g) => g.kind), ['screen', 'battery', 'rear_camera']);
   assert.strictEqual(r.guides[1].minutes, 60);
   assert.strictEqual(r.guides[2].image, 'i2');
   assert.deepStrictEqual(r.documents, [{ title: 'Despiece', url: 'https://www.ifixit.com/Document/Download/abc' }, { title: 'y.pdf', url: 'https://www.ifixit.com/Document/def/y.pdf' }]);
@@ -71,7 +71,7 @@ test('deviceInfo: usa la sugerencia de búsqueda si el nombre no coincide', asyn
 });
 
 test('guide: pasos ordenados, texto plano sin HTML y tipos de viñeta', async () => {
-  repair.setFetch(fakeFetch({ '/guides/1': GUIDE }));
+  repair.setFetch(fakeFetch({ '/guides/1?langid=es': GUIDE }));
   const g = await repair.guide(1);
   assert.strictEqual(g.intro, 'Cambia la batería. x');
   assert.deepStrictEqual(g.steps.map((s) => s.title), ['Calentar', 'Quitar batería']);
@@ -82,6 +82,18 @@ test('guide: pasos ordenados, texto plano sin HTML y tipos de viñeta', async ()
   assert.deepStrictEqual(g.steps[0].images, []);
   assert.strictEqual(g.author, 'ana');
   await assert.rejects(repair.guide('1; rm'), /no válida/);
+});
+
+test('guideKind: tipos de reparación', () => {
+  const k = (t) => repair.guideKind(t);
+  assert.strictEqual(k('iPhone 13 Front Camera Replacement'), 'front_camera');
+  assert.strictEqual(k('iPhone 13 Rear Camera Replacement'), 'rear_camera');
+  assert.strictEqual(k('iPhone 13 Face ID Sensor Replacement'), 'faceid');
+  assert.strictEqual(k('Galaxy S10 Earpiece Speaker Replacement'), 'earpiece');
+  assert.strictEqual(k('Galaxy S10 Loudspeaker Replacement'), 'speaker');
+  assert.strictEqual(k('Pixel 8 USB-C Charging Port Replacement'), 'charging');
+  assert.strictEqual(k('Pixel 8 Motherboard Replacement'), 'board');
+  assert.strictEqual(k('Pixel 8 Power Button Replacement'), 'buttons');
 });
 
 test('searchLinks: incluye tus sitios con site:', () => {

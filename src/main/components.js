@@ -155,10 +155,15 @@ async function androidTest(serial, test, on) {
       return sh('cmd vibrator_manager synced oneshot 800 2>/dev/null || cmd vibrator vibrate 800 2>/dev/null || cmd vibrator vibrate -f 800 mvr').then(() => true);
     case 'touch':
       return sh(`settings put system pointer_location ${on ? 1 : 0}; settings put system show_touches ${on ? 1 : 0}`).then(() => !!on);
-    case 'camera':
-      return sh('am start -a android.media.action.STILL_IMAGE_CAMERA').then(() => true);
-    case 'selfie':
-      return sh('am start -a android.media.action.STILL_IMAGE_CAMERA --ei android.intent.extras.CAMERA_FACING 1 --ei android.intent.extras.LENS_FACING_FRONT 1 --ez android.intent.extra.USE_FRONT_CAMERA true').then(() => true);
+    case 'camera': case 'selfie': {
+      // -S cierra la app de cámara antes de abrirla: si no, se queda en la última cámara usada e ignora la petición.
+      const front = test === 'selfie';
+      const extras = front
+        ? '--ei android.intent.extras.CAMERA_FACING 1 --ei android.intent.extras.LENS_FACING_FRONT 1 --ez android.intent.extra.USE_FRONT_CAMERA true --ez com.google.assistant.extra.USE_FRONT_CAMERA true --es camerafacing front'
+        : '--ei android.intent.extras.CAMERA_FACING 0 --ei android.intent.extras.LENS_FACING_BACK 1 --ez android.intent.extra.USE_FRONT_CAMERA false --ez com.google.assistant.extra.USE_FRONT_CAMERA false --es camerafacing rear';
+      const stop = 'p=$(cmd package resolve-activity --brief -a android.media.action.STILL_IMAGE_CAMERA 2>/dev/null | tail -n 1 | cut -d/ -f1); case "$p" in *.*) am force-stop "$p";; esac; sleep 1';
+      return sh(`${stop}; am start -W -a android.media.action.STILL_IMAGE_CAMERA ${extras}`).then(() => true);
+    }
     case 'sound':
       return sh('am start -a android.settings.SOUND_SETTINGS').then(() => true);
     default: throw new Error('Prueba no válida');

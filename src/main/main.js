@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require('electron');
 const path = require('node:path');
 const log = require('electron-log/main');
 const android = require('./android');
@@ -85,12 +85,63 @@ handle('diag:components', (platform, serial) => (platform === 'ios' ? components
 handle('diag:test', (serial, test, on) => components.androidTest(serial, test, on));
 handle('diag:factoryMenu', (manufacturer) => components.factoryMenu(manufacturer));
 handle('diag:battery', (platform, serial) => (platform === 'ios' ? diagnostics.iosBattery(serial) : diagnostics.androidBattery(serial)));
-handle('diag:report', async (platform, serial) => {
+const reportsDir = () => path.join(outDir(), 'Informes');
+/** Solo se actúa sobre PDF de la carpeta de informes. */
+function reportFile(f) {
+  const file = path.resolve(String(f || ''));
+  if (path.dirname(file) !== path.resolve(reportsDir()) || !file.endsWith('.pdf') || !fs.existsSync(file)) throw new Error('Informe no encontrado');
+  return file;
+}
+handle('diag:report', async (platform, serial, extra = {}) => {
   const info = await mod(platform).getInfo(serial);
   const battery = await (platform === 'ios' ? diagnostics.iosBattery(serial) : diagnostics.androidBattery(serial)).catch(() => null);
-  const file = diagnostics.saveReport(path.join(outDir(), 'Informes'), info, battery);
-  shell.openPath(file);
-  return file;
+  const parts = Array.isArray(extra.components) ? extra.components
+    : await (platform === 'ios' ? components.iosComponents(serial) : components.androidComponents(serial)).catch(() => null);
+  const html = diagnostics.reportHtml(info, battery, { components: parts, analysis: extra.analysis || null });
+  fs.mkdirSync(reportsDir(), { recursive: true });
+  const file = path.join(reportsDir(), diagnostics.reportName(info, 'pdf'));
+  const w = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true } });
+  try {
+    await w.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    fs.writeFileSync(file, await w.webContents.printToPDF({ pageSize: 'A4', printBackground: true }));
+  } finally { w.destroy(); }
+  return { file, name: path.basename(file), device: info.marketName || info.model || serial };
+});
+handle('report:open', (f) => shell.openPath(reportFile(f)).then((e) => { if (e) throw new Error(e); return true; }));
+handle('report:show', (f) => { shell.showItemInFolder(reportFile(f)); return true; });
+handle('report:saveAs', async (f) => {
+  const src = reportFile(f);
+  const r = await dialog.showSaveDialog(win, { title: 'Guardar informe en PDF', defaultPath: path.join(app.getPath('desktop'), path.basename(src)), filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+  if (r.canceled || !r.filePath) return null;
+  fs.copyFileSync(src, r.filePath);
+  return r.filePath;
+});
+/** Copia el PDF como archivo al portapapeles: se pega con Ctrl+V en WhatsApp, correo o una carpeta. */
+function copyFileToClipboard(file) {
+  if (process.platform !== 'win32') throw new Error('Solo disponible en Windows');
+  clipboard.writeBuffer('FileNameW', Buffer.from(`${file}\0`, 'ucs2'));
+  return true;
+}
+handle('report:copy', (f) => copyFileToClipboard(reportFile(f)));
+handle('report:whatsapp', async (f) => {
+  copyFileToClipboard(reportFile(f));
+  await shell.openExternal('whatsapp://').catch(() => shell.openExternal('https://web.whatsapp.com/'));
+  return true;
+});
+handle('report:email', async (f, device) => {
+  const file = reportFile(f);
+  copyFileToClipboard(file);
+  const subject = encodeURIComponent(`Informe de diagnóstico · ${device || ''}`.trim());
+  const body = encodeURIComponent('Hola,\n\nTe adjunto el informe de diagnóstico de tu dispositivo.\n\nUn saludo.');
+  await shell.openExternal(`mailto:?subject=${subject}&body=${body}`);
+  return true;
+});
+handle('report:toPhone', async (f, platform, serial) => {
+  const file = reportFile(f);
+  if (platform !== 'android') throw new Error('Apple no permite copiar archivos sueltos al iPhone por cable. Envíalo por WhatsApp o correo.');
+  const dest = `/sdcard/Download/${path.basename(file)}`;
+  await tools.run('adb', ['-s', serial, 'push', file, dest], { timeout: 60000 });
+  return dest;
 });
 handle('apps:list', (platform, serial, opts) => (platform === 'ios' ? apps.iosList(serial, opts) : apps.androidList(serial, opts)));
 handle('apps:uninstall', async (platform, serial, id, opts = {}) => {
@@ -137,6 +188,7 @@ handle('art:kind', (info) => deviceArt.frameKind(info));
 const libRoot = () => path.join(outDir(), 'Biblioteca');
 handle('repair:device', (name) => repair.deviceInfo(name));
 handle('repair:guide', (id) => repair.guide(id));
+handle('repair:search', (name, es, en) => repair.repairSearch(name, es, en));
 handle('repair:links', (name) => repair.searchLinks(name, settings.load(app.getPath('userData')).schematicSites));
 handle('settings:get', () => settings.load(app.getPath('userData')));
 handle('settings:set', (patch) => settings.save(app.getPath('userData'), patch));

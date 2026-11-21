@@ -42,13 +42,25 @@ async function findDevice(name) {
 const absUrl = (u) => (!u ? null : /^https:\/\//.test(u) ? u : u.startsWith('/') ? `https://www.ifixit.com${u}` : null);
 const img = (o) => (o && (o.standard || o.medium || o['440x330'] || o.thumbnail)) || null;
 
+// Tipos de reparación (el orden importa: lo más específico primero).
 const KIND = [
-  ['screen', /screen|display|pantalla|lcd|oled/i],
+  ['faceid', /face ?id|true ?depth|dot projector|flood illuminator/i],
+  ['front_camera', /front[- ]?facing|front camera|selfie/i],
+  ['fingerprint', /fingerprint|touch ?id|home button/i],
+  ['earpiece', /earpiece|ear speaker/i],
+  ['screen', /screen|display|lcd|oled|digitizer|front panel|front glass|pantalla/i],
   ['battery', /battery|bater/i],
-  ['charging', /charging|charge port|usb|dock|conector|charging port/i],
-  ['camera', /camera|c[áa]mara/i],
-  ['back', /back (cover|glass)|rear (cover|glass)|tapa/i],
+  ['charging', /charging|charge port|usb|dock|lightning|conector/i],
+  ['back', /back (cover|glass|panel|housing)|rear (cover|glass|panel|housing)|tapa/i],
+  ['rear_camera', /camera|lens|c[áa]mara/i],
+  ['speaker', /speaker|altavoz/i],
+  ['microphone', /microphone|\bmic\b/i],
+  ['buttons', /button|volume|side key|switch|bot[óo]n/i],
+  ['vibrator', /vibrat|taptic/i],
+  ['sim', /sim (card|tray|reader)|antenna/i],
+  ['board', /motherboard|logic board|mainboard|board|placa/i],
 ];
+const KIND_ORDER = ['screen', 'battery', 'charging', 'back', 'rear_camera', 'front_camera', 'faceid', 'fingerprint', 'speaker', 'earpiece', 'microphone', 'buttons', 'vibrator', 'sim', 'board', 'other'];
 function guideKind(title) { const k = KIND.find(([, re]) => re.test(title)); return k ? k[0] : 'other'; }
 
 function summarize(w) {
@@ -56,8 +68,7 @@ function summarize(w) {
     id: g.guideid, title: g.title, type: g.type, subject: g.subject, difficulty: g.difficulty || null,
     minutes: g.time_required_max ? Math.round(g.time_required_max / 60) : null, url: g.url, image: img(g.image), kind: guideKind(`${g.subject || ''} ${g.title}`),
   }));
-  const order = { screen: 0, battery: 1, charging: 2, back: 3, camera: 4, other: 5 };
-  guides.sort((a, b) => (order[a.kind] - order[b.kind]) || ((a.type === 'replacement' ? 0 : 1) - (b.type === 'replacement' ? 0 : 1)));
+  guides.sort((a, b) => (KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind)) || ((a.type === 'replacement' ? 0 : 1) - (b.type === 'replacement' ? 0 : 1)));
   return {
     title: w.display_title || w.title, url: w.url || `https://www.ifixit.com/Device/${encodeURIComponent(String(w.title).replace(/ /g, '_'))}`,
     image: img(w.image), description: w.description || null,
@@ -78,11 +89,11 @@ function plain(raw) {
 
 async function guide(id) {
   if (!Number.isInteger(Number(id))) throw new Error('Guía no válida');
-  const g = await getJson(`${API}/guides/${Number(id)}`);
+  const g = await getJson(`${API}/guides/${Number(id)}?langid=es`);
   if (!g) throw new Error('Guía no encontrada');
   return {
     id: g.guideid, title: g.title, difficulty: g.difficulty || null, minutes: g.time_required_max ? Math.round(g.time_required_max / 60) : null,
-    url: g.url, intro: plain(g.introduction_raw),
+    url: g.url, intro: plain(g.introduction_raw), langid: g.langid || null,
     tools: (g.tools || []).map((t) => ({ name: t.text || t.title, url: t.url || null })),
     parts: (g.parts || []).map((p) => ({ name: p.text, quantity: p.quantity || 1, url: p.url || null })),
     steps: (g.steps || []).sort((a, b) => a.orderby - b.orderby).map((s) => ({
@@ -108,7 +119,18 @@ function searchLinks(name, sites = []) {
     { label: sites.length ? `Esquemas en tus sitios (${sites.length})` : 'Esquemas y diagramas (buscar)', url: `https://www.google.com/search?q=${q(`${name} schematic diagram${where}`)}` },
     { label: 'Vídeos de reparación (YouTube)', url: `https://www.youtube.com/results?search_query=${q(`${name} cambio de pantalla`)}` },
     { label: 'Problemas típicos (foros)', url: `https://www.google.com/search?q=${q(`${name} problemas comunes solución`)}` },
+    ...(/iphone|ipad/i.test(name) ? [{ label: 'Manuales oficiales de Apple (Self Service Repair)', url: 'https://support.apple.com/self-service-repair' }] : []),
+    ...(/samsung|galaxy/i.test(name) ? [{ label: 'Guías oficiales de Samsung (autorreparación)', url: 'https://www.samsung.com/uk/support/self-repair/' }] : []),
   ];
 }
 
-module.exports = { deviceInfo, guide, candidates, plain, guideKind, searchLinks, setFetch, summarize };
+/** Búsquedas cuando iFixit no tiene guía de esa reparación para el modelo. */
+function repairSearch(name, repairEs, repairEn) {
+  const q = (x) => encodeURIComponent(x);
+  return [
+    { label: 'Buscar en iFixit', url: `https://www.ifixit.com/Search?query=${q(`${name} ${repairEn}`)}` },
+    { label: 'Vídeos en YouTube', url: `https://www.youtube.com/results?search_query=${q(`${name} ${repairEs}`)}` },
+  ];
+}
+
+module.exports = { repairSearch, KIND_ORDER, deviceInfo, guide, candidates, plain, guideKind, searchLinks, setFetch, summarize };

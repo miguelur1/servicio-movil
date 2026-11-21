@@ -170,7 +170,7 @@ async function select(d) {
     ['Fotos', () => photosTab(d, model, st)],
     ['Contactos y mensajes', () => contactsTab(d, model, st)],
     [ios ? 'Archivos de la copia' : 'Archivos', () => (ios ? iosFilesTab(d, st) : filesTab(d, st))],
-    ['Reparación', () => repairTab(i.marketName || i.model || d.model || d.serial, st)],
+    ['Reparación', () => repairTab(d, i.marketName || i.model || d.model || d.serial, st)],
   ];
   const body = el('div', { class: 'tabbody' });
   const bar = el('div', { class: 'tabs' });
@@ -190,17 +190,146 @@ async function select(d) {
 
 // ── Reparación: guías de iFixit, búsquedas y biblioteca propia ──────────────
 const DIFF = { 'Very easy': 'Muy fácil', Easy: 'Fácil', Moderate: 'Moderada', Difficult: 'Difícil', 'Very difficult': 'Muy difícil' };
-const KINDS = { screen: 'Pantalla', battery: 'Batería', charging: 'Carga / conector', back: 'Tapa trasera', camera: 'Cámara', other: 'Otras reparaciones' };
+// [id, nombre, término de búsqueda en inglés, término en español]
+const REPAIRS = [
+  ['screen', 'Pantalla', 'screen replacement', 'cambiar pantalla'], ['battery', 'Batería', 'battery replacement', 'cambiar batería'],
+  ['charging', 'Conector de carga', 'charging port replacement', 'cambiar conector de carga'], ['back', 'Tapa trasera', 'back glass replacement', 'cambiar tapa trasera'],
+  ['rear_camera', 'Cámara trasera', 'rear camera replacement', 'cambiar cámara trasera'], ['front_camera', 'Cámara frontal', 'front camera replacement', 'cambiar cámara frontal'],
+  ['faceid', 'Face ID / sensores frontales', 'face id replacement', 'face id reparación'], ['fingerprint', 'Lector de huellas', 'fingerprint sensor replacement', 'cambiar lector de huellas'],
+  ['speaker', 'Altavoz', 'loudspeaker replacement', 'cambiar altavoz'], ['earpiece', 'Auricular (llamadas)', 'earpiece speaker replacement', 'cambiar auricular'],
+  ['microphone', 'Micrófono', 'microphone replacement', 'cambiar micrófono'], ['buttons', 'Botones', 'power button replacement', 'cambiar botón encendido'],
+  ['vibrator', 'Vibrador', 'vibrator replacement', 'cambiar vibrador'], ['sim', 'SIM y antenas', 'sim card reader replacement', 'cambiar lector sim'],
+  ['board', 'Placa base', 'motherboard replacement', 'cambiar placa base'], ['other', 'Otras reparaciones', 'repair', 'reparación'],
+];
+const REPAIR_NAME = Object.fromEntries(REPAIRS.map(([id, n]) => [id, n]));
 const link = (label, url, cls = 'linkbtn') => el('button', { class: cls, onclick: () => window.api.openUrl(url) }, label);
 
-function repairTab(name, st) {
+// Resultados del diagnóstico por dispositivo, para el informe y las reparaciones recomendadas.
+const diagCache = new Map();
+const cacheFor = (serial) => { if (!diagCache.has(serial)) diagCache.set(serial, {}); return diagCache.get(serial); };
+
+/** Reparaciones recomendadas a partir del diagnóstico: { tipo: [motivos] } */
+function recommend(c) {
+  const out = {};
+  const add = (k, why) => { (out[k] = out[k] || []); if (!out[k].includes(why)) out[k].push(why); };
+  const b = c.battery;
+  if (b && b.healthPercent != null && b.healthPercent < 85) add('battery', `salud de la batería ${b.healthPercent} %`);
+  for (const p of c.components || []) {
+    if (p.status !== 'bad' && p.status !== 'warn') continue;
+    const map = { touch: 'screen', display: 'screen', fingerprint: 'fingerprint', charging: 'charging', modem: 'board', storage: 'board', proximity: 'faceid' };
+    if (p.id === 'camera') { add(/0 frontal/.test(p.detail) ? 'front_camera' : 'rear_camera', `cámaras: ${p.detail}`); continue; }
+    if (p.id === 'sensors' && /proximidad/.test(p.detail)) { add('screen', 'sensor de proximidad (parte superior de la pantalla)'); continue; }
+    if (p.id === 'sim' && p.status === 'bad') { add('sim', p.detail); continue; }
+    if ((p.id === 'wifi' || p.id === 'bluetooth') && p.status === 'bad') { add('board', `${p.name}: ${p.detail}`); continue; }
+    if (p.id === 'panics' && /flex de carga|Micr/i.test(p.detail)) { add('charging', p.detail); continue; }
+    if (p.id === 'panics' && /bater/i.test(p.detail)) { add('battery', p.detail); continue; }
+    if (p.id === 'panics' && /Face ID|SEP/i.test(p.detail)) { add('faceid', p.detail); continue; }
+    if (p.id === 'panics' && p.status === 'bad') { add('board', p.detail); continue; }
+    if (map[p.id] && p.status === 'bad') add(map[p.id], `${p.name}: ${p.detail}`);
+  }
+  const fmap = { moisture: 'charging', charging: 'charging', battery: 'battery', thermal: 'battery', camera: 'rear_camera', touch: 'screen', display: 'screen', storage_hw: 'board', sim: 'sim', modem: 'board', fingerprint: 'fingerprint', audio: 'speaker' };
+  for (const f of (c.analysis && c.analysis.findings) || []) if (fmap[f.id]) add(fmap[f.id], `registro: ${f.title.toLowerCase()}`);
+  return out;
+}
+
+function repairTab(d, name, st) {
+  const cache = cacheFor(d.serial);
   const wrap = el('div', {});
-  const ifx = el('div', {}, el('p', { class: 'muted' }, `Buscando «${name}» en iFixit…`));
+  const head = el('div', {}, el('p', { class: 'muted' }, `Buscando las guías de «${name}»…`));
+  const picker = el('div', { class: 'repairs' });
+  const detail = el('div', { class: 'repairdetail' });
+  let device = null; let selected = null;
+
+  const guideRow = (g) => el('li', { onclick: () => openGuide(g.id) },
+    g.image ? el('img', { src: g.image, alt: '' }) : el('div', { class: 'noimg' }),
+    el('div', {}, el('div', {}, g.title), el('div', { class: 'muted small' }, [g.type === 'replacement' ? 'Sustitución' : null, DIFF[g.difficulty] || g.difficulty, g.minutes ? `${g.minutes} min` : null].filter(Boolean).join(' · '))));
+
+  const choose = async (kind) => {
+    selected = kind;
+    picker.querySelectorAll('.repair').forEach((x) => x.classList.toggle('on', x.dataset.kind === kind));
+    const [, label, en, es] = REPAIRS.find((r) => r[0] === kind);
+    const gs = device && device.found ? device.guides.filter((g) => g.kind === kind) : [];
+    const why = recommend(cache)[kind];
+    if (!gs.length) {
+      const r = await window.api.repairSearch(name, es, en);
+      put(detail, el('h4', {}, label), why ? el('p', { class: 'warnt small' }, `Recomendada por el diagnóstico: ${why.join('; ')}.`) : null,
+        note(`iFixit no tiene una guía de «${label.toLowerCase()}» para este modelo. Búscala en:`),
+        el('div', { class: 'actions' }, (r.ok ? r.data : []).map((l) => link(l.label, l.url, 'act ghost'))));
+      return;
+    }
+    put(detail, el('h4', {}, `${label} · ${plural(gs.length, 'guía', 'guías')}`), why ? el('p', { class: 'warnt small' }, `Recomendada por el diagnóstico: ${why.join('; ')}.`) : null,
+      el('ul', { class: 'guides' }, gs.map(guideRow)));
+    if (gs.length === 1 || gs.filter((g) => g.type === 'replacement').length === 1) openGuide((gs.find((g) => g.type === 'replacement') || gs[0]).id);
+  };
+
+  // Abre sola la primera reparación recomendada que tenga guía (solo si aún no se ha elegido ninguna).
+  const autoPick = () => {
+    if (selected || !device || !device.found) return;
+    const order = REPAIRS.map(([id]) => id);
+    const rec = Object.keys(recommend(cache)).sort((x, y) => order.indexOf(x) - order.indexOf(y)).find((kk) => device.guides.some((g) => g.kind === kk));
+    if (rec) choose(rec);
+  };
+
+  const renderPicker = () => {
+    const rec = recommend(cache);
+    const counts = {};
+    for (const g of (device && device.guides) || []) counts[g.kind] = (counts[g.kind] || 0) + 1;
+    const items = REPAIRS.filter(([id]) => (id !== 'other' || counts.other) && (id !== 'faceid' || d.platform === 'ios' || counts.faceid))
+      .sort((x, y) => (rec[y[0]] ? 1 : 0) - (rec[x[0]] ? 1 : 0) || ((counts[y[0]] ? 1 : 0) - (counts[x[0]] ? 1 : 0)));
+    put(picker, items.map(([id, label]) => {
+      const b = el('button', { class: `repair${rec[id] ? ' rec' : ''}${selected === id ? ' on' : ''}`, onclick: () => choose(id) },
+        el('div', { class: 'rname' }, label),
+        el('div', { class: 'muted small' }, counts[id] ? plural(counts[id], 'guía con fotos', 'guías con fotos') : 'buscar en internet'),
+        rec[id] ? el('div', { class: 'rwhy' }, `Recomendada: ${rec[id][0].split('.')[0].slice(0, 80)}`) : null);
+      b.dataset.kind = id;
+      return b;
+    }));
+  };
+
+  const openGuide = async (id) => {
+    const view = el('div', { class: 'guideview' }, el('p', { class: 'muted' }, 'Cargando la guía…'));
+    put(detail, el('button', { class: 'ghost', onclick: () => choose(selected) }, '← Volver a las guías'), view);
+    const r = await window.api.repairGuide(id);
+    if (!r.ok) { put(view, el('p', { class: 'err' }, r.error)); return; }
+    const g = r.data;
+    let k = 0; let all = false;
+    const counter = el('span', { class: 'muted' });
+    const stepBox = el('div', {});
+    const dots = el('div', { class: 'dots' }, g.steps.map((_, n) => { const x = el('i', { onclick: () => { k = n; draw(); } }); return x; }));
+    const prev = el('button', { class: 'ghost', onclick: () => { if (k > 0) { k--; draw(); } } }, '← Anterior');
+    const next = el('button', { class: 'act', onclick: () => { if (k < g.steps.length - 1) { k++; draw(); } } }, 'Siguiente →');
+    const mode = el('button', { class: 'ghost small-btn', onclick: () => { all = !all; draw(); } }, 'Ver todos los pasos');
+    const stepEl = (s, n) => el('div', { class: 'step' },
+      el('h5', {}, `Paso ${n + 1} de ${g.steps.length}${s.title ? ` · ${s.title}` : ''}`),
+      el('div', { class: 'stepgrid' },
+        el('div', { class: 'stepimgs' }, s.images.map((u) => el('img', { src: u, alt: '', onclick: () => window.api.openUrl(u) }))),
+        el('ul', {}, s.lines.map((l) => { const li = el('li', { class: l.kind }, l.kind === 'caution' ? '⚠ ' : l.kind === 'note' ? 'ℹ ' : '', l.text); li.style.marginLeft = `${l.level * 16}px`; return li; }))));
+    const draw = () => {
+      mode.textContent = all ? 'Ver paso a paso' : 'Ver todos los pasos';
+      prev.hidden = all; next.hidden = all; counter.hidden = all; dots.hidden = all;
+      if (all) { put(stepBox, g.steps.map(stepEl)); return; }
+      put(stepBox, g.steps.length ? stepEl(g.steps[k], k) : note('Esta guía no tiene pasos.'));
+      counter.textContent = `Paso ${k + 1} de ${g.steps.length}`;
+      prev.disabled = k === 0; next.disabled = k === g.steps.length - 1;
+      dots.querySelectorAll('i').forEach((x, n) => x.classList.toggle('on', n === k));
+    };
+    put(view,
+      el('h3', {}, g.title),
+      el('p', { class: 'muted small' }, [DIFF[g.difficulty] || g.difficulty, g.minutes ? `hasta ${g.minutes} min` : null, `${g.steps.length} pasos`, g.langid && g.langid !== 'es' ? 'en inglés (no hay traducción)' : null].filter(Boolean).join(' · ')),
+      g.intro ? el('p', {}, g.intro) : null,
+      el('div', { class: 'tp' },
+        g.tools.length ? el('div', {}, el('b', {}, 'Herramientas'), el('ul', {}, g.tools.map((t) => el('li', {}, t.name)))) : null,
+        g.parts.length ? el('div', {}, el('b', {}, 'Piezas'), el('ul', {}, g.parts.map((p) => el('li', {}, `${p.quantity} × ${p.name}`)))) : null),
+      el('div', { class: 'stepnav' }, prev, counter, next, mode), dots, stepBox,
+      el('p', { class: 'muted small' }, 'Contenido de iFixit con licencia CC BY-NC-SA. ', link('Abrir la guía original', g.url)));
+    draw();
+  };
+
+  // Esquemas, manuales y biblioteca (secundario)
   const linksBox = el('div', { class: 'actions' });
   const lib = el('div', {});
   const sitesInput = el('textarea', { class: 'search wide', rows: '3', placeholder: 'Un dominio por línea, p. ej. foro-de-reparaciones.com' });
-
-  const loadLinks = () => window.api.repairLinks(name).then((r) => { if (r.ok) put(linksBox, ...r.data.map((l) => link(l.label, l.url, 'act ghost'))); });
+  const loadLinks = () => window.api.repairLinks(name).then((r) => { if (r.ok) put(linksBox, r.data.map((l) => link(l.label, l.url, 'act ghost'))); });
   const loadLib = () => window.api.libraryList(name).then((r) => {
     if (!r.ok) { put(lib, el('p', { class: 'err' }, r.error)); return; }
     const files = r.data.files;
@@ -208,60 +337,35 @@ function repairTab(name, st) {
       ? el('ul', { class: 'files' }, files.map((f) => el('li', {}, '📄', el('span', { class: 'dir', onclick: () => window.api.libraryOpen(name, f.name) }, f.name), el('span', { class: 'muted small' }, fmtBytes(f.size)))))
       : note('Aún no tienes documentos para este modelo. Añade aquí tus esquemas, manuales o fotos de placa y aparecerán solos cada vez que conectes este modelo.'));
   });
+  const docsBox = el('div', {});
+  const extras = el('details', { class: 'section' }, el('summary', {}, el('b', {}, 'Esquemas, manuales oficiales y tu biblioteca')),
+    el('h5', {}, 'Búsquedas y manuales'), linksBox,
+    el('details', {}, el('summary', { class: 'muted small' }, 'Tus sitios de esquemas'), sitesInput,
+      actionButton('Guardar sitios', (btn) => st.run(btn, () => window.api.settingsSet({ schematicSites: sitesInput.value.split(/\s+/) }), (x) => { sitesInput.value = x.schematicSites.join('\n'); loadLinks(); return `Guardados ${plural(x.schematicSites.length, 'sitio', 'sitios')}.`; }), true)),
+    docsBox,
+    el('h5', {}, 'Tu biblioteca para este modelo'), lib,
+    el('div', { class: 'actions' },
+      actionButton('Añadir documentos…', (btn) => st.run(btn, () => window.api.libraryAdd(name), (x) => { loadLib(); return x ? 'Documentos añadidos.' : 'Cancelado.'; })),
+      actionButton('Abrir carpeta', (btn) => st.run(btn, () => window.api.libraryFolder(name), (dir) => `Carpeta: ${dir}`), true)),
+    note('Los esquemas eléctricos de los fabricantes no son públicos: la app busca en los sitios que tú indiques y abre los resultados en el navegador, sin descargar nada por su cuenta.'));
 
-  const showDevice = (r) => {
-    if (!r.ok) { put(ifx, el('p', { class: 'err' }, `No se pudo consultar iFixit: ${r.error}`), note('Comprueba la conexión a internet.')); return; }
-    const x = r.data;
-    if (!x.found) { put(ifx, note(`iFixit no tiene una página para «${name}». Usa las búsquedas de abajo.`)); return; }
-    const head = el('div', { class: 'ifxhead' },
-      x.image ? el('img', { src: x.image, alt: '', class: 'ifximg' }) : null,
-      el('div', {}, el('h4', {}, x.title), x.description ? el('p', { class: 'muted small' }, x.description) : null,
-        el('div', { class: 'actions' }, link('Problemas típicos y soluciones', x.troubleshootingUrl, 'act'), link('Preguntas y respuestas', x.answersUrl, 'act ghost'), link('Ver en iFixit', x.url, 'act ghost'))));
-    const groups = el('div', {});
-    if (!x.guides.length) groups.append(note('No hay guías paso a paso publicadas para este modelo.'));
-    for (const k of Object.keys(KINDS)) {
-      const gs = x.guides.filter((g) => g.kind === k);
-      if (!gs.length) continue;
-      groups.append(el('h5', {}, KINDS[k]), el('ul', { class: 'guides' }, gs.map((g) => el('li', { onclick: () => openGuide(g.id) },
-        g.image ? el('img', { src: g.image, alt: '' }) : el('div', { class: 'noimg' }),
-        el('div', {}, el('div', {}, g.title), el('div', { class: 'muted small' }, [DIFF[g.difficulty] || g.difficulty, g.minutes ? `${g.minutes} min` : null].filter(Boolean).join(' · ')))))));
-    }
-    const docs = x.documents.length ? section('Documentos públicos en iFixit', el('ul', { class: 'files' }, x.documents.map((d) => el('li', {}, '📄', el('span', { class: 'dir', onclick: () => window.api.openUrl(d.url) }, d.title), el('span', {}))))) : null;
-    put(ifx, head, section('Guías paso a paso', groups), docs);
-  };
+  put(wrap, head, section('¿Qué hay que reparar?', note('Elige la reparación y te muestro la guía paso a paso con fotos. Las marcadas en naranja las recomienda el diagnóstico.'), picker, detail), extras);
+  renderPicker();
 
-  const openGuide = async (id) => {
-    const view = el('div', {}, el('p', { class: 'muted' }, 'Cargando guía…'));
-    put(wrap, el('button', { class: 'ghost', onclick: () => render() }, '← Volver'), view);
-    const r = await window.api.repairGuide(id);
-    if (!r.ok) { put(view, el('p', { class: 'err' }, r.error)); return; }
-    const g = r.data;
-    put(view, 
-      el('h3', {}, g.title),
-      el('p', { class: 'muted small' }, [DIFF[g.difficulty] || g.difficulty, g.minutes ? `hasta ${g.minutes} min` : null, g.author ? `autor: ${g.author}` : null].filter(Boolean).join(' · ')),
-      g.intro ? el('p', {}, g.intro) : null,
-      g.tools.length ? section('Herramientas', el('ul', {}, g.tools.map((t) => el('li', {}, t.name)))) : null,
-      g.parts.length ? section('Piezas', el('ul', {}, g.parts.map((p) => el('li', {}, `${p.quantity} × ${p.name}`)))) : null,
-      ...g.steps.map((s, k) => el('div', { class: 'step' },
-        el('h5', {}, `Paso ${k + 1}${s.title ? ` · ${s.title}` : ''}`),
-        el('div', { class: 'stepimgs' }, s.images.map((u) => el('img', { src: u, alt: '' }))),
-        el('ul', {}, s.lines.map((l) => { const li = el('li', { class: l.kind }, l.text); li.style.marginLeft = `${l.level * 16}px`; return li; })))),
-      el('p', { class: 'muted small' }, 'Contenido de iFixit con licencia CC BY-NC-SA. ', link('Abrir la guía original', g.url)));
-  };
-
-  const render = () => {
-    put(wrap, ifx,
-      section('Esquemas, vídeos y foros', linksBox,
-        el('details', {}, el('summary', { class: 'muted small' }, 'Tus sitios de esquemas (Ajustes)'), sitesInput,
-          actionButton('Guardar sitios', (btn) => st.run(btn, () => window.api.settingsSet({ schematicSites: sitesInput.value.split(/\s+/) }), (x) => { sitesInput.value = x.schematicSites.join('\n'); loadLinks(); return `Guardados ${plural(x.schematicSites.length, 'sitio', 'sitios')}.`; }), true)),
-        note('Los esquemas eléctricos de los fabricantes no son públicos: la app busca en los sitios que tú indiques y abre los resultados en el navegador, sin descargar nada por su cuenta.')),
-      section('Tu biblioteca para este modelo', lib, el('div', { class: 'actions' },
-        actionButton('Añadir documentos…', (btn) => st.run(btn, () => window.api.libraryAdd(name), (x) => { loadLib(); return x ? 'Documentos añadidos.' : 'Cancelado.'; })),
-        actionButton('Abrir carpeta', (btn) => st.run(btn, () => window.api.libraryFolder(name), (dir) => `Carpeta: ${dir}`), true))));
-  };
-
-  render();
-  window.api.repairDevice(name).then(showDevice);
+  window.api.repairDevice(name).then((r) => {
+    if (!r.ok) { put(head, el('p', { class: 'err' }, `No se pudo consultar iFixit: ${r.error}`), note('Comprueba la conexión a internet.')); return; }
+    device = r.data;
+    if (!device.found) { put(head, note(`iFixit no tiene una página para «${name}». Las reparaciones te llevan a búsquedas en internet.`)); renderPicker(); return; }
+    put(head, el('div', { class: 'ifxhead' },
+      device.image ? el('img', { src: device.image, alt: '', class: 'ifximg' }) : null,
+      el('div', {}, el('h4', {}, device.title), device.description ? el('p', { class: 'muted small' }, device.description) : null,
+        el('div', { class: 'actions' }, link('Problemas típicos y soluciones', device.troubleshootingUrl, 'act ghost'), link('Preguntas y respuestas', device.answersUrl, 'act ghost')))));
+    if (device.documents.length) put(docsBox, el('h5', {}, 'Documentos públicos en iFixit'), el('ul', { class: 'files' }, device.documents.map((x) => el('li', {}, '📄', el('span', { class: 'dir', onclick: () => window.api.openUrl(x.url) }, x.title), el('span', {})))));
+    renderPicker(); autoPick();
+  });
+  // Si aún no se ha hecho el diagnóstico, se lee ahora (solo lectura) para recomendar reparaciones.
+  if (!cache.components) window.api.components(d.platform, d.serial).then((r) => { if (r.ok) { cache.components = r.data; renderPicker(); autoPick(); } });
+  if (!cache.battery) window.api.battery(d.platform, d.serial).then((r) => { if (r.ok) { cache.battery = r.data; renderPicker(); autoPick(); } });
   window.api.settingsGet().then((r) => { if (r.ok) sitesInput.value = r.data.schematicSites.join('\n'); });
   loadLinks(); loadLib();
   return wrap;
@@ -306,6 +410,7 @@ function componentsSection(d, st) {
   const summary = el('p', {});
   const load = () => window.api.components(d.platform, d.serial).then((r) => {
     if (!r.ok) { put(grid, el('p', { class: 'err' }, r.error)); return; }
+    cacheFor(d.serial).components = r.data;
     put(grid, r.data.map((c) => {
       const [cls, label] = STATUS[c.status] || STATUS.info;
       return el('div', { class: `card comp ${c.status}` }, el('div', { class: 'k' }, c.name, el('span', { class: `pill ${cls}` }, label)), el('div', { class: 'v small' }, c.detail));
@@ -365,16 +470,39 @@ function logPanel(d, st) {
     const ar = await window.api.analyzeLogs(d.platform, d.serial, lr.data);
     if (!ar.ok) { put(res, el('p', { class: 'err' }, ar.error)); return; }
     st.say('Análisis terminado.', 'ok');
+    cacheFor(d.serial).analysis = ar.data;
     put(res, renderAnalysis(ar.data));
   };
   return { label, run, box: el('div', {}, res, det) };
+}
+
+function reportSection(d, st) {
+  const share = el('div', {});
+  const create = actionButton('Crear informe en PDF', async (btn) => {
+    const c = cacheFor(d.serial);
+    const r = await st.run(btn, () => window.api.report(d.platform, d.serial, { components: c.components || null, analysis: c.analysis || null }), (x) => `Informe creado: ${x.name}`);
+    if (!r || !r.ok) return;
+    const { file, device } = r.data;
+    const go = (label, fn, ok, ghost = true) => actionButton(label, (b) => st.run(b, fn, ok), ghost);
+    put(share, el('p', { class: 'ok small' }, `📄 ${r.data.name}`), el('div', { class: 'actions' },
+      go('Abrir', () => window.api.reportOpen(file), () => 'Abierto.', false),
+      go('Guardar como…', () => window.api.reportSaveAs(file), (x) => `Guardado en ${x}`),
+      go('Enviar por WhatsApp', () => window.api.reportWhatsapp(file), () => 'PDF copiado. En WhatsApp, abre el chat del cliente y pulsa Ctrl+V para adjuntarlo.'),
+      go('Enviar por correo', () => window.api.reportEmail(file, device), () => 'Correo abierto y PDF copiado: pulsa Ctrl+V en el mensaje para adjuntarlo.'),
+      go('Copiar PDF', () => window.api.reportCopy(file), () => 'PDF copiado: pégalo (Ctrl+V) donde quieras compartirlo.'),
+      d.platform === 'android' ? go('Pasar al móvil del cliente', () => window.api.reportToPhone(file, d.platform, d.serial), (x) => `Copiado al teléfono en ${x} (carpeta Descargas).`) : null,
+      go('Mostrar en la carpeta', () => window.api.reportShow(file), () => 'Carpeta abierta.')));
+  });
+  return section('Informe para el cliente', el('div', { class: 'actions' }, create), share,
+    note('Incluye el dispositivo, la batería, el estado de cada pieza y, si lo has hecho, el análisis del registro. Con espacio para las firmas.'));
 }
 
 function diagTab(d, i, st) {
   const logs = logPanel(d, st);
   return el('div', {}, componentsSection(d, st), d.platform === 'android' ? testsSection(d, i, st) : null, batterySection(d, st),
     section('Registro de fallos', el('div', { class: 'actions' }, actionButton(logs.label, logs.run)), logs.box,
-      note(d.platform === 'ios' ? 'Lee el registro en directo y los informes de fallo guardados en el iPhone (reinicios, apps que se cierran), sin borrarlos.' : 'Lee el logcat, el historial de fallos y el motivo del último reinicio.')));
+      note(d.platform === 'ios' ? 'Lee el registro en directo y los informes de fallo guardados en el iPhone (reinicios, apps que se cierran), sin borrarlos.' : 'Lee el logcat, el historial de fallos y el motivo del último reinicio.')),
+    reportSection(d, st));
 }
 
 function batterySection(d, st) {
@@ -383,6 +511,7 @@ function batterySection(d, st) {
   window.api.battery(d.platform, d.serial).then((r) => {
     if (!r.ok) { box.replaceChildren(el('p', { class: 'err' }, r.error)); return; }
     const b = r.data;
+    cacheFor(d.serial).battery = b;
     const health = card('Salud de la batería', b.healthPercent != null ? `${b.healthPercent} %` : 'No disponible');
     if (b.healthPercent != null) { const f = el('i'); f.style.width = `${Math.min(100, b.healthPercent)}%`; f.className = b.healthPercent >= 85 ? '' : b.healthPercent >= 80 ? 'warn' : 'bad'; health.append(el('div', { class: 'bar' }, f)); }
     box.replaceChildren(health,
@@ -395,9 +524,7 @@ function batterySection(d, st) {
       : b.healthPercent >= 85 ? ['ok', 'Batería en buen estado.'] : b.healthPercent >= 80 ? ['warnt', 'Batería algo desgastada.'] : ['err', 'Batería degradada (por debajo del 80 %): se recomienda cambiarla.'];
     verdict.replaceChildren(el('p', { class: v[0] }, v[1]));
   });
-  return section('Batería', box, verdict,
-    el('div', { class: 'actions' }, actionButton('Generar informe para el cliente', (btn) => st.run(btn, () => window.api.report(d.platform, d.serial), (f) => `Informe guardado en ${f} (se abre en el navegador; puedes imprimirlo o guardarlo como PDF).`))),
-    note('El informe incluye modelo, versión, nº de serie, almacenamiento y estado de la batería, con espacio para firmas.'));
+  return section('Batería', box, verdict);
 }
 
 function appsTab(d, st) {

@@ -85,3 +85,17 @@ test('informe HTML: datos, veredicto y escape de caracteres', () => {
   const f = D.saveReport(dir, { platform: 'android', model: 'Pixel 8', serial: 'S' }, null);
   assert.match(path.basename(f), /^informe-Pixel_8-/);
 });
+
+test('reportHtml: incluye piezas y análisis del registro, escapando el texto', () => {
+  const d = require('../src/main/diagnostics');
+  const html = d.reportHtml({ platform: 'android', marketName: 'Pixel 8', model: 'Pixel 8' }, { healthPercent: 90 }, {
+    components: [{ id: 'touch', name: 'Táctil', status: 'bad', detail: 'No se detecta <b>' }],
+    analysis: { verdict: 'warn', summary: 'Hay 1 tipo de fallo a revisar.', findings: [{ sev: 'media', title: 'Apps que se cierran solas', count: 2, explain: 'x', fix: 'y' }] },
+  });
+  assert.match(html, /Estado de las piezas/);
+  assert.match(html, /<span class="st bad">Fallo<\/span> · No se detecta &lt;b&gt;/);
+  assert.match(html, /Análisis del registro del sistema/);
+  assert.match(html, /Media: Apps que se cierran solas<\/b> \(2 veces\)/);
+  assert.doesNotMatch(d.reportHtml({ platform: 'ios' }, null), /Estado de las piezas/);
+  assert.match(d.reportName({ marketName: 'Google Pixel 8' }, 'pdf'), /^informe-Google_Pixel_8-.*\.pdf$/);
+});

@@ -93,3 +93,16 @@ h5 { margin:12px 0 4px; font-size:13px; color:var(--muted); text-transform:upper
 .pill.sev-alta { color:#fca5a5; } .pill.sev-media { color:var(--warn); } .pill.sev-baja { color:#93c5fd; }
 .finding pre { max-height:160px; }
 .card.comp .v { word-break:normal; overflow-wrap:anywhere; color:var(--text); font-size:13.5px; } .card.comp.ok, .card.comp.bad, .card.comp.warn { color:inherit; }
+/* Reparaciones: selector y guía paso a paso */
+.repairs { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:8px; margin:8px 0 12px; }
+.repair { text-align:left; padding:10px 12px; border-radius:8px; display:grid; gap:3px; align-content:start; background:var(--bg); color:var(--text); border:1px solid var(--line); }
+.repair:hover { border-color:#3b82f6; }
+.repair .rname { font-weight:600; } .repair.rec { border-color:var(--warn); } .repair .rwhy { color:var(--warn); font-size:11.5px; }
+.repair.on { border-color:#3b82f6; box-shadow:0 0 0 1px #3b82f6 inset; background:#0f1b2d; }
+.repairdetail h4 { margin:8px 0; }
+.stepnav { display:flex; gap:10px; align-items:center; margin:12px 0 6px; flex-wrap:wrap; }
+.dots { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; } .dots i { width:10px; height:10px; border-radius:50%; background:var(--line); cursor:pointer; } .dots i.on { background:#3b82f6; }
+.stepgrid { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:16px; align-items:start; }
+.stepgrid .stepimgs img { width:100%; max-width:480px; cursor:zoom-in; } .stepgrid ul { margin:0; padding-left:18px; } .stepgrid li { margin:6px 0; }
+.tp { display:flex; gap:32px; flex-wrap:wrap; } .tp ul { margin:4px 0; padding-left:18px; }
+details.section > summary { cursor:pointer; }
