@@ -6,19 +6,37 @@ para Android e iPhone/iPad, usando las herramientas oficiales y de código abier
 - **Android**: Android SDK Platform-Tools de Google (`adb`, `fastboot`).
 - **iPhone/iPad**: [libimobiledevice](https://libimobiledevice.org/) (la misma base que usan otras herramientas de taller).
 
-## Qué hace hoy (v0.1)
+## Qué hace hoy (v0.2)
 
-| Función | Android | iPhone |
+| Función | Android | iPhone/iPad |
 |---|---|---|
 | Detección automática de dispositivos (cada 3 s) | ✓ adb + fastboot | ✓ |
 | Ficha: modelo, versión, build, parche, bootloader, nº serie | ✓ | ✓ |
-| Batería (nivel, estado, salud, temperatura) | ✓ | nivel y carga |
-| Almacenamiento usado/total | ✓ | ✓ |
-| Captura de pantalla (se guarda en Documentos\Servicio Movil) | ✓ | ✓ (requiere Developer Disk Image) |
-| Logs (logcat / syslog) | ✓ | ✓ |
-| Instalar APK | ✓ | — |
-| Reiniciar a sistema / recovery / bootloader | ✓ (también desde fastboot) | — |
+| Batería y almacenamiento | ✓ | ✓ |
+| Captura de pantalla / logs | ✓ | ✓ (captura: iOS 17+ requiere modo desarrollador) |
+| Copia de seguridad completa | carpetas de usuario + contactos + SMS + APK opcionales | ✓ completa (idevicebackup2, como iTunes) |
+| Restaurar copia / pasar datos a otro teléfono | ✓ (carpetas, apps; contactos a importar) | ✓ (también la copia de otro iPhone) |
+| Fotos y vídeos al PC | ✓ directo | ✓ extraídas de la copia, formato original |
+| Fotos del PC al teléfono | ✓ | — (Apple solo lo permite por restauración o iCloud) |
+| Contactos → .vcf | ✓ | ✓ (desde la copia) |
+| Mensajes → .csv | ✓ SMS (si el sistema lo permite) | ✓ SMS e iMessage (desde la copia) |
+| Explorador de archivos | ✓ almacenamiento del teléfono | ✓ archivos de la copia (WhatsApp, notas, apps…) |
+| Instalar APK, reiniciar a recovery/fastboot | ✓ | — |
 | Auto-actualización desde GitHub Releases | ✓ | ✓ |
+
+### Cómo funciona el lado iPhone
+
+iOS no expone el teléfono como un disco. Para fotos, contactos, mensajes y archivos, la app hace
+(o reutiliza) una **copia de seguridad local sin cifrar** con `idevicebackup2` y lee su `Manifest.db`.
+Si el usuario tiene activado «Cifrar copia local», la copia se puede restaurar pero no leer.
+Se empaqueta libimobiledevice actual (paquete MSYS2 `ucrt64`), compatible con iOS recientes.
+
+### Limitaciones conocidas (honestas)
+
+- Android 12+ no deja copiar los datos internos de las apps sin root; se copian los APK.
+- Algunos Android no permiten leer SMS desde ADB: la app lo avisa.
+- Restaurar en iPhone exige desactivar «Buscar mi iPhone» (protección de Apple, no se salta).
+- Fotos en «iCloud con optimización de almacenamiento» no están en el teléfono y no salen en la copia.
 
 ## Fuera de alcance (no se implementará)
 

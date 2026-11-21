@@ -1,0 +1,28 @@
+#!/bin/sh
+# idevicebackup2 falso: imita la salida real y genera una copia de prueba.
+echo "idevicebackup2 $@" >> "${FAKE_LOG:-/dev/null}"
+HERE=$(dirname "$0")
+UDID=""; CMD=""; DIR=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -u) UDID="$2"; shift 2 ;;
+    -s) shift 2 ;;
+    backup|restore) CMD="$1"; shift ;;
+    --*) shift ;;
+    *) DIR="$1"; shift ;;
+  esac
+done
+if [ "$CMD" = backup ]; then
+  echo "Backup directory is \"$DIR\""
+  echo "Requesting backup from device..."
+  echo "Receiving files"
+  printf '[=====                     ]  20%% Finished\r[=============             ]  52%% Finished\r'
+  node "$HERE/../helpers/make-ios-backup.js" "$DIR" "$UDID" || exit 1
+  printf '[==========================] 100%% Finished\n'
+  echo "Backup Successful."
+elif [ "$CMD" = restore ]; then
+  if [ -n "$FAKE_FINDMY" ]; then echo "ERROR: Find My iPhone must be disabled"; exit 1; fi
+  echo "Requesting restore from device..."
+  printf '[==========================] 100%% Finished\n'
+  echo "Restore Successful."
+fi

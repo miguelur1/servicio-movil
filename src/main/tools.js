@@ -56,6 +56,40 @@ function stream(name, args, onData) {
   return child;
 }
 
+/**
+ * Lanza un proceso largo, entrega cada línea (stdout y stderr) a onLine y resuelve al terminar.
+ * Devuelve {child, done}; done rechaza si el código de salida no es 0.
+ */
+function runStream(name, args, onLine = () => {}) {
+  const child = spawn(resolveTool(name), args, { windowsHide: true });
+  let tail = '';
+  const feed = (b) => {
+    const parts = (tail + b.toString('utf8')).split(/\r\n|\r|\n/);
+    tail = parts.pop();
+    for (const l of parts) if (l.trim()) onLine(l);
+  };
+  child.stdout.on('data', feed);
+  child.stderr.on('data', feed);
+  const done = new Promise((resolve, reject) => {
+    let last = '';
+    const wrap = onLine;
+    onLine = (l) => { last = l; wrap(l); };
+    child.on('error', (e) => reject(e.code === 'ENOENT' ? new Error(`No se encontró "${name}".`) : e));
+    child.on('close', (code, signal) => {
+      if (tail.trim()) onLine(tail);
+      if (signal) return reject(new Error('Operación cancelada.'));
+      if (code !== 0) return reject(new Error(last || `${name} terminó con código ${code}`));
+      resolve();
+    });
+  });
+  return { child, done };
+}
+
+/** Comilla un argumento para el shell del dispositivo Android (adb shell une los argumentos). */
+function shq(s) {
+  return `'${String(s).replace(/'/g, `'\\''`)}'`;
+}
+
 async function available(name, args = ['version']) {
   try {
     await run(name, args, { timeout: 8000 });
@@ -65,4 +99,4 @@ async function available(name, args = ['version']) {
   }
 }
 
-module.exports = { resolveTool, run, stream, available, binRoot };
+module.exports = { resolveTool, run, stream, runStream, shq, available, binRoot };

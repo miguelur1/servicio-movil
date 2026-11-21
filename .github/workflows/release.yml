@@ -26,8 +26,18 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm ci
-      - run: npm run fetch-tools
-        env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+      - run: node scripts/fetch-tools.js --skip-ios
+      - name: Empaquetar libimobiledevice (MSYS2, compatible con iOS recientes)
+        shell: C:\msys64\usr\bin\bash.exe -leo pipefail {0}
+        env: { CHERE_INVOKING: '1', MSYSTEM: UCRT64 }
+        run: scripts/bundle-libimobiledevice.sh
+      - name: Probar que las herramientas arrancan
+        shell: bash
+        run: |
+          resources/bin/platform-tools/adb.exe version
+          resources/bin/libimobiledevice/idevice_id.exe --version
+          resources/bin/libimobiledevice/idevicebackup2.exe --version
+          resources/bin/libimobiledevice/idevice_id.exe -l || true
       # Cada push a main publica la Release v<versión de package.json>.
       # Se compila sin publicar y se sube con gh: electron-builder sube los archivos en paralelo
       # y cada subida intentaba crear la release a la vez (422 "Published releases must have a valid tag").

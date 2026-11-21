@@ -82,6 +82,9 @@ async function libimobiledevice() {
 
 (async () => {
   await platformTools();
+  // En Windows con MSYS2 (runner de GitHub) se usa libimobiledevice actual vía
+  // scripts/bundle-libimobiledevice.sh. Este build antiguo (1.2.1) queda solo como respaldo.
+  if (process.argv.includes('--skip-ios')) return console.log(`✓ platform-tools listo en ${BIN}`);
   await libimobiledevice();
   console.log(`✓ Herramientas listas en ${BIN}`);
 })().catch((e) => { console.error(`✗ ${e.message}`); process.exit(1); });

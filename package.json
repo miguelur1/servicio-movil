@@ -1,7 +1,7 @@
 {
   "name": "servicio-movil",
   "productName": "Servicio Móvil",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Herramienta de servicio técnico para Android e iPhone en Windows (ADB, Fastboot, libimobiledevice).",
   "main": "src/main/main.js",
   "author": "Miguel",
@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "electron-log": "^5.4.4",
-    "electron-updater": "^6.8.11"
+    "electron-updater": "^6.8.11",
+    "sql.js": "^1.17.0"
   },
   "devDependencies": {
     "electron": "^45.4.1",
@@ -25,16 +26,41 @@
   "build": {
     "appId": "com.miguelur1.serviciomovil",
     "productName": "Servicio Móvil",
-    "directories": { "output": "dist" },
-    "files": ["src/**/*", "package.json"],
-    "extraResources": [{ "from": "resources/bin", "to": "bin", "filter": ["**/*"] }],
-    "win": { "target": ["nsis"], "artifactName": "ServicioMovil-Setup-${version}.${ext}" },
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "ServicioMovil-Setup-${version}.${ext}"
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true
     },
-    "publish": [{ "provider": "github", "owner": "miguelur1", "repo": "servicio-movil", "releaseType": "release" }]
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "miguelur1",
+        "repo": "servicio-movil",
+        "releaseType": "release"
+      }
+    ]
   }
 }

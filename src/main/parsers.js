@@ -107,3 +107,67 @@ module.exports = {
   parseAdbDevices, parseFastbootDevices, parseGetprop, parseDumpsysBattery,
   parseDf, parseIdeviceinfo, parseIdeviceIds, formatBytes,
 };
+
+/**
+ * Salida de `adb shell content query --uri … --projection a:b:c` → [{a, b, c}].
+ * Las columnas se separan por ", clave=" usando solo las claves pedidas, así que un valor
+ * puede contener comas. La última columna puede ocupar varias líneas (cuerpo de SMS).
+ */
+function parseContentQuery(text, keys) {
+  const rows = [];
+  const alt = keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const split = new RegExp(`(?:^|, )(${alt})=`, 'g');
+  let cur = null;
+  const flush = () => {
+    if (cur === null) return;
+    const row = {};
+    const marks = [];
+    let m;
+    split.lastIndex = 0;
+    while ((m = split.exec(cur)) !== null) marks.push({ key: m[1], start: m.index, valStart: m.index + m[0].length });
+    marks.forEach((mk, i) => {
+      const v = cur.slice(mk.valStart, i + 1 < marks.length ? marks[i + 1].start : cur.length);
+      row[mk.key] = v === 'NULL' ? null : v;
+    });
+    rows.push(row);
+  };
+  for (const line of String(text).split(/\r?\n/)) {
+    const m = /^Row: \d+ (.*)$/.exec(line);
+    if (m) { flush(); cur = m[1]; } else if (cur !== null) cur += `\n${line}`;
+  }
+  flush();
+  // Quita el salto final que deja la última línea vacía de la salida.
+  for (const r of rows) for (const k of keys) if (typeof r[k] === 'string') r[k] = r[k].replace(/\n+$/, '');
+  return rows;
+}
+
+/** `stat -c '%F|%s|%Y|%n'` (toybox) → [{name, path, dir, size, mtime}] ordenado: carpetas primero. */
+function parseStatList(text) {
+  const out = [];
+  for (const line of String(text).split(/\r?\n/)) {
+    const p = line.split('|');
+    if (p.length < 4) continue;
+    const [type, size, mtime, ...rest] = p;
+    const full = rest.join('|');
+    const name = full.replace(/\/+$/, '').split('/').pop();
+    if (!name || name === '.' || name === '..' || name === '*' || name === '.*') continue;
+    out.push({ name, path: full, dir: /directory/.test(type), link: /symbolic link/.test(type), size: Number(size) || 0, mtime: Number(mtime) * 1000 || null });
+  }
+  return out.sort((a, b) => (b.dir - a.dir) || a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+}
+
+/** Línea de progreso de idevicebackup2: "[=====    ]  42% Finished" → 42 */
+function parseBackupProgress(line) {
+  const m = /(\d{1,3}(?:\.\d+)?)% Finished/.exec(line);
+  return m ? Math.min(100, Math.round(Number(m[1]))) : null;
+}
+
+/** `pm list packages -3` → ['com.whatsapp', …] */
+function parsePmPackages(text) {
+  return String(text).split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith('package:')).map((l) => l.slice(8)).sort();
+}
+
+module.exports.parseContentQuery = parseContentQuery;
+module.exports.parseStatList = parseStatList;
+module.exports.parseBackupProgress = parseBackupProgress;
+module.exports.parsePmPackages = parsePmPackages;

@@ -1,5 +1,6 @@
 #!/bin/sh
 case "$*" in
+  *"-q com.apple.mobile.backup -k WillEncrypt"*) echo false ;;
   *"-q com.apple.mobile.battery"*) printf 'BatteryCurrentCapacity: 91\nBatteryIsCharging: true\n' ;;
   *"-q com.apple.disk_usage"*) printf 'TotalDataCapacity: 100000\nTotalDataAvailable: 25000\n' ;;
   *) printf 'DeviceName: iPhone de prueba\nProductType: iPhone14,5\nProductVersion: 17.4.1\nBuildVersion: 21E236\nSerialNumber: F2LTEST\n' ;;

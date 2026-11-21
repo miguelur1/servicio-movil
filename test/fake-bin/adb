@@ -8,6 +8,28 @@ case "$*" in
   *"exec-out screencap -p") printf '\211PNG\r\n\032\nFAKEDATA' ;;
   *"logcat -d"*) printf '11-20 10:00:00.000 I/Test( 1): hola\n' ;;
   *"reboot"*) : ;;
+  *"shell for d in"*) printf '/sdcard/DCIM\n/sdcard/Download\n' ;;
+  *"pull -a /sdcard/"*|*"pull /data/app/"*)
+    # adb pull [-a] <remoto> <local>: crea <local>/<nombre>/archivo de prueba
+    eval "LOCAL=\${$#}"; for a in "$@"; do case "$a" in /sdcard/*|/data/app/*) REM="$a" ;; esac; done
+    NAME=$(basename "$REM")
+    case "$NAME" in *.apk) mkdir -p "$LOCAL"; printf 'apk' > "$LOCAL/$NAME" ;; *) mkdir -p "$LOCAL/$NAME/Camera"; printf 'jpg' > "$LOCAL/$NAME/Camera/IMG_1.jpg" ;; esac
+    echo "$REM: 1 file pulled." ;;
+  *"push "*) echo "1 file pushed." ;;
+  *"install-multiple -r"*) echo "Success" ;;
+  *"content query --uri content://com.android.contacts/data"*)
+    printf 'Row: 0 contact_id=1, mimetype=vnd.android.cursor.item/name, data1=Luis Pérez, data2=Luis, data3=Pérez\n'
+    printf 'Row: 1 contact_id=1, mimetype=vnd.android.cursor.item/phone_v2, data1=+34 611 22 33 44, data2=2, data3=NULL\n'
+    printf 'Row: 2 contact_id=1, mimetype=vnd.android.cursor.item/email_v2, data1=luis@example.com, data2=1, data3=NULL\n'
+    printf 'Row: 3 contact_id=7, mimetype=vnd.android.cursor.item/organization, data1=Recambios, S.A., data2=NULL, data3=NULL\n' ;;
+  *"content query --uri content://sms"*)
+    if [ -n "$FAKE_SMS_DENIED" ]; then echo "Error while accessing provider:sms"; echo "java.lang.SecurityException: Permission Denial: reading com.android.providers.telephony.SmsProvider"; exit 0; fi
+    printf 'Row: 0 address=+34611223344, date=1700000000000, type=1, read=1, body=Hola, ¿qué tal?\nSegunda línea\n'
+    printf 'Row: 1 address=+34611223344, date=1700000060000, type=2, read=1, body=Bien\n' ;;
+  *"content call"*|*"am broadcast"*|*"mkdir -p"*) : ;;
+  *"shell pm list packages -3"*) printf 'package:com.ejemplo.app\n' ;;
+  *"shell pm path"*) printf 'package:/data/app/com.ejemplo.app/base.apk\npackage:/data/app/com.ejemplo.app/split_es.apk\n' ;;
+  *"shell cd "*) printf "directory|3488|1700000000|/sdcard/DCIM\nregular file|12|1700000001|/sdcard/nota con espacios.txt\ndirectory|0|0|/sdcard/.\n" ;;
   *"install -r"*) echo "Performing Streamed Install"; echo "Success" ;;
   *) echo "adb falso: $*" >&2; exit 1 ;;
 esac
