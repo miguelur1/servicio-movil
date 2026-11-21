@@ -28,16 +28,27 @@ jobs:
       - run: npm ci
       - run: npm run fetch-tools
         env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
-      # Cada push a main publica la Release v<versión de package.json> (crea la etiqueta).
-      # Si esa versión ya está publicada, electron-builder no la sobrescribe: para sacar
-      # una actualización basta con subir "version" en package.json.
+      # Cada push a main publica la Release v<versión de package.json>.
+      # Se compila sin publicar y se sube con gh: electron-builder sube los archivos en paralelo
+      # y cada subida intentaba crear la release a la vez (422 "Published releases must have a valid tag").
+      # Re-ejecutar es seguro: si la release ya existe, se reemplazan sus archivos (--clobber).
+      # Para sacar una actualización basta con subir "version" en package.json.
       - name: Publicar release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: npx electron-builder --win nsis --publish always
+        shell: bash
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          npx electron-builder --win nsis --publish never
+          TAG="v$(node -p "require('./package.json').version")"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes "Servicio Móvil $TAG"
+          gh release upload "$TAG" dist/*.exe dist/*.exe.blockmap dist/latest.yml --clobber
       - name: Compilar instalador (sin publicar)
         if: github.event_name == 'pull_request'
-        run: npx electron-builder --win nsis --publish never
+        shell: bash
+        run: |
+          npx electron-builder --win nsis --publish never
+          # La auto-actualización necesita latest.yml junto al .exe en la release.
+          ls dist/*.exe dist/*.exe.blockmap dist/latest.yml
       - uses: actions/upload-artifact@v4
         with:
           name: instalador-windows
