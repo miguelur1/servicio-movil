@@ -14,6 +14,7 @@ const diagnostics = require('./diagnostics');
 const apps = require('./apps');
 const migration = require('./migrate');
 const deviceArt = require('./deviceart');
+const components = require('./components');
 const repair = require('./repair');
 const library = require('./library');
 const settings = require('./settings');
@@ -79,6 +80,10 @@ handle('tools:status', () => Promise.all([
   tools.available('ideviceinstaller', ['--version']),
 ]));
 handle('app:version', () => app.getVersion());
+handle('device:analyzeLogs', (platform, serial, text) => (platform === 'ios' ? ios.logAnalysis(serial, text) : android.logAnalysis(serial)));
+handle('diag:components', (platform, serial) => (platform === 'ios' ? components.iosComponents(serial) : components.androidComponents(serial)));
+handle('diag:test', (serial, test, on) => components.androidTest(serial, test, on));
+handle('diag:factoryMenu', (manufacturer) => components.factoryMenu(manufacturer));
 handle('diag:battery', (platform, serial) => (platform === 'ios' ? diagnostics.iosBattery(serial) : diagnostics.androidBattery(serial)));
 handle('diag:report', async (platform, serial) => {
   const info = await mod(platform).getInfo(serial);

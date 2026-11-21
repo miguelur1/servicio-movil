@@ -25,6 +25,8 @@ Compatible con cualquier Android con ADB (Samsung, Xiaomi, Motorola… y **Googl
 | Contactos → .vcf | ✓ | ✓ (desde la copia) |
 | Mensajes → .csv | ✓ SMS (si el sistema lo permite) | ✓ SMS e iMessage (desde la copia) |
 | Explorador de archivos | ✓ almacenamiento del teléfono | ✓ archivos de la copia (WhatsApp, notas, apps…) |
+| Diagnóstico por piezas (pantalla, táctil, cámaras, sensores, huella, Wi-Fi, Bluetooth, NFC, módem, SIM, GPS, memoria, carga) | ✓ + pruebas manuales (vibración, táctil, cámaras) | ✓ módem, SIM, Wi-Fi, Bluetooth, proximidad y reinicios (panics) con la pieza probable |
+| Análisis del registro: fallos, apps que se cierran, reinicios y qué revisar | ✓ logcat, historial de fallos y motivo del último reinicio | ✓ syslog e informes de fallo (sin borrarlos) |
 | Salud de batería (ciclos, capacidad real vs. diseño) e informe para el cliente | ✓ (si el fabricante la expone) | ✓ |
 | Gestor de apps: ver, instalar, desinstalar, copiar | ✓ APK/split APK; desactivar y recuperar apps del sistema | ✓ IPA firmados para el dispositivo (ideviceinstaller) |
 | Pasar datos de un móvil a otro (los dos conectados) | Android→Android: fotos, archivos, contactos, apps | iPhone→Android: fotos y contactos · iPhone→iPhone: copia completa. Android→iPhone: Apple no lo permite por cable (se indica «Pasar a iOS») |

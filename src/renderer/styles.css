@@ -84,3 +84,12 @@ h5 { margin:12px 0 4px; font-size:13px; color:var(--muted); text-transform:upper
 .step { border-top:1px solid var(--line); padding:10px 0; } .stepimgs { display:flex; gap:8px; flex-wrap:wrap; }
 .stepimgs img { width:min(300px,100%); border-radius:6px; }
 .step li.caution { color:var(--warn); } .step li.note { color:#93c5fd; }
+/* Diagnóstico por piezas y análisis de registro */
+.pill { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:10px; font-size:11px; border:1px solid currentColor; text-transform:none; letter-spacing:0; }
+.card.comp.bad { border-color:#7f1d1d; } .card.comp.warn { border-color:#78350f; }
+.finding { border:1px solid var(--line); border-left:4px solid var(--line); border-radius:8px; padding:8px 12px; margin:8px 0; display:grid; gap:4px; }
+.finding.alta { border-left-color:var(--err); } .finding.media { border-left-color:var(--warn); } .finding.baja { border-left-color:#3b82f6; }
+.ftitle { font-weight:600; } .ftitle .pill { margin:0 8px 0 0; }
+.pill.sev-alta { color:#fca5a5; } .pill.sev-media { color:var(--warn); } .pill.sev-baja { color:#93c5fd; }
+.finding pre { max-height:160px; }
+.card.comp .v { word-break:normal; overflow-wrap:anywhere; color:var(--text); font-size:13.5px; } .card.comp.ok, .card.comp.bad, .card.comp.warn { color:inherit; }

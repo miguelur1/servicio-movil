@@ -11,10 +11,11 @@ const settings = require('../src/main/settings');
 const WIKI = {
   title: 'Xiaomi Redmi Note 11 Pro 5G', display_title: 'Xiaomi Redmi Note 11 Pro 5G', url: 'https://www.ifixit.com/Device/Xiaomi_Redmi_Note_11_Pro_5G',
   image: { standard: 'https://guide-images.cdn.ifixit.com/igi/dev.standard' }, description: 'Smartphone de Xiaomi.',
-  documents: [{ title: 'Despiece', url: 'https://www.ifixit.com/Document/abc' }],
+  documents: [{ title: 'Despiece', url: '/Document/abc/x.pdf', download_url: 'https://www.ifixit.com/Document/Download/abc' }, { filename: 'y.pdf', url: '/Document/def/y.pdf', display: null }],
   guides: [
     { guideid: 2, title: 'Xiaomi Redmi Note 11 Pro 5G Camera Replacement', subject: 'Camera', type: 'replacement', difficulty: 'Easy', time_required_max: 1800, url: 'u2', image: { medium: 'i2' } },
     { guideid: 1, title: 'Xiaomi Redmi Note 11 Pro 5G Battery Replacement', subject: 'Battery', type: 'replacement', difficulty: 'Moderate', time_required_max: 3600, url: 'u1', image: null },
+    { guideid: 9, title: 'Battery Disconnection', subject: '', type: 'technique', flags: ['GUIDE_PREREQ_ONLY'], url: 'u9' },
     { guideid: 3, title: 'Xiaomi Redmi Note 11 Pro 5G Screen Replacement', subject: 'Display', type: 'replacement', difficulty: 'Difficult', url: 'u3' },
   ],
 };
@@ -52,7 +53,8 @@ test('deviceInfo: encuentra el modelo probando variantes y ordena guías', async
   assert.deepStrictEqual(r.guides.map((g) => g.kind), ['screen', 'battery', 'camera']);
   assert.strictEqual(r.guides[1].minutes, 60);
   assert.strictEqual(r.guides[2].image, 'i2');
-  assert.strictEqual(r.documents.length, 1);
+  assert.deepStrictEqual(r.documents, [{ title: 'Despiece', url: 'https://www.ifixit.com/Document/Download/abc' }, { title: 'y.pdf', url: 'https://www.ifixit.com/Document/def/y.pdf' }]);
+  assert.ok(!r.guides.some((g) => g.id === 9), 'oculta las guías auxiliares');
   assert.match(r.troubleshootingUrl, /Xiaomi_Redmi_Note_11_Pro_5G_Troubleshooting$/);
   assert.ok(calls.every((u) => u.startsWith('https://www.ifixit.com/api/2.0/')));
 });

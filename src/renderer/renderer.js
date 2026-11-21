@@ -91,6 +91,8 @@ function actionButton(label, onClick, ghost) {
   return b;
 }
 const section = (title, ...kids) => el('div', { class: 'section' }, el('h4', {}, title), ...kids);
+/** replaceChildren ignorando null/undefined (si no, el DOM escribe «null»). */
+const put = (node, ...kids) => node.replaceChildren(...kids.flat().filter((k) => k !== null && k !== undefined));
 const note = (t) => el('p', { class: 'muted small' }, t);
 const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
 
@@ -162,7 +164,7 @@ async function select(d) {
 
   const tabs = [
     ['Información', () => infoTab(d, i, st)],
-    ['Diagnóstico', () => diagTab(d, st)],
+    ['Diagnóstico', () => diagTab(d, i, st)],
     ['Apps', () => appsTab(d, st)],
     ['Copia de seguridad', () => backupTab(d, model, st)],
     ['Fotos', () => photosTab(d, model, st)],
@@ -198,19 +200,19 @@ function repairTab(name, st) {
   const lib = el('div', {});
   const sitesInput = el('textarea', { class: 'search wide', rows: '3', placeholder: 'Un dominio por línea, p. ej. foro-de-reparaciones.com' });
 
-  const loadLinks = () => window.api.repairLinks(name).then((r) => { if (r.ok) linksBox.replaceChildren(...r.data.map((l) => link(l.label, l.url, 'act ghost'))); });
+  const loadLinks = () => window.api.repairLinks(name).then((r) => { if (r.ok) put(linksBox, ...r.data.map((l) => link(l.label, l.url, 'act ghost'))); });
   const loadLib = () => window.api.libraryList(name).then((r) => {
-    if (!r.ok) { lib.replaceChildren(el('p', { class: 'err' }, r.error)); return; }
+    if (!r.ok) { put(lib, el('p', { class: 'err' }, r.error)); return; }
     const files = r.data.files;
-    lib.replaceChildren(files.length
+    put(lib, files.length
       ? el('ul', { class: 'files' }, files.map((f) => el('li', {}, '📄', el('span', { class: 'dir', onclick: () => window.api.libraryOpen(name, f.name) }, f.name), el('span', { class: 'muted small' }, fmtBytes(f.size)))))
       : note('Aún no tienes documentos para este modelo. Añade aquí tus esquemas, manuales o fotos de placa y aparecerán solos cada vez que conectes este modelo.'));
   });
 
   const showDevice = (r) => {
-    if (!r.ok) { ifx.replaceChildren(el('p', { class: 'err' }, `No se pudo consultar iFixit: ${r.error}`), note('Comprueba la conexión a internet.')); return; }
+    if (!r.ok) { put(ifx, el('p', { class: 'err' }, `No se pudo consultar iFixit: ${r.error}`), note('Comprueba la conexión a internet.')); return; }
     const x = r.data;
-    if (!x.found) { ifx.replaceChildren(note(`iFixit no tiene una página para «${name}». Usa las búsquedas de abajo.`)); return; }
+    if (!x.found) { put(ifx, note(`iFixit no tiene una página para «${name}». Usa las búsquedas de abajo.`)); return; }
     const head = el('div', { class: 'ifxhead' },
       x.image ? el('img', { src: x.image, alt: '', class: 'ifximg' }) : null,
       el('div', {}, el('h4', {}, x.title), x.description ? el('p', { class: 'muted small' }, x.description) : null,
@@ -225,16 +227,16 @@ function repairTab(name, st) {
         el('div', {}, el('div', {}, g.title), el('div', { class: 'muted small' }, [DIFF[g.difficulty] || g.difficulty, g.minutes ? `${g.minutes} min` : null].filter(Boolean).join(' · ')))))));
     }
     const docs = x.documents.length ? section('Documentos públicos en iFixit', el('ul', { class: 'files' }, x.documents.map((d) => el('li', {}, '📄', el('span', { class: 'dir', onclick: () => window.api.openUrl(d.url) }, d.title), el('span', {}))))) : null;
-    ifx.replaceChildren(head, section('Guías paso a paso', groups), docs);
+    put(ifx, head, section('Guías paso a paso', groups), docs);
   };
 
   const openGuide = async (id) => {
     const view = el('div', {}, el('p', { class: 'muted' }, 'Cargando guía…'));
-    wrap.replaceChildren(el('button', { class: 'ghost', onclick: () => render() }, '← Volver'), view);
+    put(wrap, el('button', { class: 'ghost', onclick: () => render() }, '← Volver'), view);
     const r = await window.api.repairGuide(id);
-    if (!r.ok) { view.replaceChildren(el('p', { class: 'err' }, r.error)); return; }
+    if (!r.ok) { put(view, el('p', { class: 'err' }, r.error)); return; }
     const g = r.data;
-    view.replaceChildren(
+    put(view, 
       el('h3', {}, g.title),
       el('p', { class: 'muted small' }, [DIFF[g.difficulty] || g.difficulty, g.minutes ? `hasta ${g.minutes} min` : null, g.author ? `autor: ${g.author}` : null].filter(Boolean).join(' · ')),
       g.intro ? el('p', {}, g.intro) : null,
@@ -248,7 +250,7 @@ function repairTab(name, st) {
   };
 
   const render = () => {
-    wrap.replaceChildren(ifx,
+    put(wrap, ifx,
       section('Esquemas, vídeos y foros', linksBox,
         el('details', {}, el('summary', { class: 'muted small' }, 'Tus sitios de esquemas (Ajustes)'), sitesInput,
           actionButton('Guardar sitios', (btn) => st.run(btn, () => window.api.settingsSet({ schematicSites: sitesInput.value.split(/\s+/) }), (x) => { sitesInput.value = x.schematicSites.join('\n'); loadLinks(); return `Guardados ${plural(x.schematicSites.length, 'sitio', 'sitios')}.`; }), true)),
@@ -283,13 +285,10 @@ function infoTab(d, i, st) {
   if (used !== null) { const fill = el('i'); fill.style.width = `${used}%`; storageCard.append(el('div', { class: 'bar' }, fill)); }
   cards.push(storageCard);
 
-  const out = el('pre', { hidden: '' });
   const actions = el('div', { class: 'actions' });
   actions.append(actionButton('Captura de pantalla', (btn) => st.run(btn, () => window.api.screenshot(d.platform, d.serial), (f) => `Guardada en ${f}`)));
-  actions.append(actionButton(d.platform === 'ios' ? 'Registro del sistema (10 s)' : 'Logcat (últimas 2000 líneas)', async (btn) => {
-    const lr = await st.run(btn, () => window.api.logs(d.platform, d.serial), () => 'Registro cargado.');
-    if (lr && lr.ok) { out.hidden = false; out.textContent = lr.data; }
-  }, true));
+  const logs = logPanel(d, st);
+  actions.append(actionButton(logs.label, logs.run, true));
   if (d.platform === 'android') {
     actions.append(actionButton('Instalar APK…', (btn) => st.run(btn, () => window.api.installApk(d.serial), (x) => (x ? 'APK instalado.' : 'Cancelado.')), true));
     for (const [m, l] of [['system', 'Reiniciar'], ['recovery', 'Reiniciar a recovery'], ['bootloader', 'Reiniciar a fastboot']]) {
@@ -297,10 +296,88 @@ function infoTab(d, i, st) {
     }
   }
   const extra = d.platform === 'ios' ? note('En iOS 17 o posterior la captura de pantalla necesita el modo desarrollador activado en el iPhone.') : null;
-  return el('div', {}, el('div', { class: 'grid' }, cards), actions, extra, out);
+  return el('div', {}, el('div', { class: 'grid' }, cards), actions, extra, logs.box);
 }
 
-function diagTab(d, st) {
+const STATUS = { ok: ['ok', 'OK'], warn: ['warnt', 'Revisar'], bad: ['err', 'Fallo'], info: ['muted', 'Prueba manual'] };
+
+function componentsSection(d, st) {
+  const grid = el('div', { class: 'grid' }, el('p', { class: 'muted' }, 'Comprobando las piezas…'));
+  const summary = el('p', {});
+  const load = () => window.api.components(d.platform, d.serial).then((r) => {
+    if (!r.ok) { put(grid, el('p', { class: 'err' }, r.error)); return; }
+    put(grid, r.data.map((c) => {
+      const [cls, label] = STATUS[c.status] || STATUS.info;
+      return el('div', { class: `card comp ${c.status}` }, el('div', { class: 'k' }, c.name, el('span', { class: `pill ${cls}` }, label)), el('div', { class: 'v small' }, c.detail));
+    }));
+    const bad = r.data.filter((c) => c.status === 'bad'); const warn = r.data.filter((c) => c.status === 'warn');
+    summary.className = bad.length ? 'err' : warn.length ? 'warnt' : 'ok';
+    summary.textContent = bad.length ? `Fallo en: ${bad.map((c) => c.name).join(', ')}.` : warn.length ? `Revisar: ${warn.map((c) => c.name).join(', ')}.` : 'Todas las piezas que se pueden leer por cable responden bien.';
+  });
+  load();
+  return section('Piezas del teléfono', summary, grid,
+    el('div', { class: 'actions' }, actionButton('Volver a comprobar', () => { put(grid, el('p', { class: 'muted' }, 'Comprobando las piezas…')); summary.textContent = ''; load(); }, true)),
+    note(d.platform === 'ios' ? 'En iPhone, Apple solo deja leer por cable el módem, la SIM, el Wi-Fi, el Bluetooth y los reinicios. El resto se prueba en el propio teléfono.' : 'Lectura sin tocar nada del teléfono. Lo que no se puede medir por cable aparece como «Prueba manual».'));
+}
+
+function testsSection(d, i, st) {
+  let touchOn = false;
+  const touchBtn = actionButton('Prueba táctil: activar', (btn) => st.run(btn, () => window.api.diagTest(d.serial, 'touch', !touchOn), (on) => {
+    touchOn = on; btn.textContent = on ? 'Prueba táctil: desactivar' : 'Prueba táctil: activar';
+    return on ? 'Desliza el dedo por toda la pantalla: las líneas deben ser continuas. Si se cortan, hay zonas muertas.' : 'Prueba táctil desactivada.';
+  }), true);
+  const menu = el('p', { class: 'muted small' });
+  window.api.factoryMenu(i.manufacturer || i.marketName || '').then((r) => { if (r.ok && r.data) menu.textContent = `Menú de pruebas del fabricante: marca ${r.data} en el teléfono (pantalla, altavoz, micrófono, sensores…).`; });
+  return section('Pruebas manuales',
+    el('div', { class: 'actions' },
+      actionButton('Vibrar', (btn) => st.run(btn, () => window.api.diagTest(d.serial, 'vibrate'), () => '¿Ha vibrado? Si no, revisa el motor de vibración.'), true),
+      touchBtn,
+      actionButton('Abrir cámara trasera', (btn) => st.run(btn, () => window.api.diagTest(d.serial, 'camera'), () => 'Cámara abierta en el teléfono.'), true),
+      actionButton('Abrir cámara frontal', (btn) => st.run(btn, () => window.api.diagTest(d.serial, 'selfie'), () => 'Cámara abierta en el teléfono (si sale la trasera, cambia a la frontal).'), true),
+      actionButton('Ajustes de sonido', (btn) => st.run(btn, () => window.api.diagTest(d.serial, 'sound'), () => 'Prueba el tono de llamada desde ahí.'), true)),
+    menu);
+}
+
+const SEVTXT = { alta: 'Grave', media: 'Media', baja: 'Leve' };
+function renderAnalysis(a) {
+  const head = el('p', { class: a.verdict === 'bad' ? 'err' : a.verdict === 'warn' ? 'warnt' : 'ok' }, a.summary);
+  const items = a.findings.map((f) => el('div', { class: `finding ${f.sev}` },
+    el('div', { class: 'ftitle' }, el('span', { class: `pill sev-${f.sev}` }, SEVTXT[f.sev] || f.sev), f.title, f.count > 1 ? el('span', { class: 'muted small' }, ` · ${f.count} veces`) : null),
+    el('div', { class: 'small' }, f.explain),
+    el('div', { class: 'small' }, el('b', {}, 'Qué revisar: '), f.fix),
+    f.apps && f.apps.length ? el('div', { class: 'muted small' }, `Afecta a: ${f.apps.map((x) => `${x.name} (${x.count})`).join(', ')}`) : null,
+    f.examples && f.examples.length ? el('details', {}, el('summary', { class: 'muted small' }, 'Ver líneas del registro'), el('pre', {}, f.examples.join('\n'))) : null));
+  const hist = a.history && a.history.length ? el('p', { class: 'muted small' }, `Historial guardado en el teléfono: ${a.history.map((h) => `${h.title.toLowerCase()} (${h.count})`).join(', ')}.`) : null;
+  const extra = a.reports != null ? el('p', { class: 'muted small' }, `Se han revisado ${a.reports} informes de fallo del iPhone (sin borrarlos).`) : null;
+  return el('div', { class: 'analysis' }, head, ...items, hist, extra, el('p', { class: 'muted small' }, 'Interpretación automática y orientativa: confírmala con las pruebas de las piezas.'));
+}
+
+/** Botón de registro + análisis + líneas. Devuelve { label, run, box }. */
+function logPanel(d, st) {
+  const res = el('div', {});
+  const out = el('pre', {}); const det = el('details', { hidden: '' }, el('summary', {}, d.platform === 'ios' ? 'Registro del sistema completo' : 'Últimas 2000 líneas del logcat'), out);
+  const label = d.platform === 'ios' ? 'Analizar registro del sistema (10 s)' : 'Analizar logcat';
+  const run = async (btn) => {
+    put(res, el('p', { class: 'muted' }, 'Leyendo y analizando el registro…'));
+    const lr = await st.run(btn, () => window.api.logs(d.platform, d.serial), () => 'Registro leído. Analizando…');
+    if (!lr || !lr.ok) { put(res); return; }
+    out.textContent = lr.data; det.hidden = false;
+    const ar = await window.api.analyzeLogs(d.platform, d.serial, lr.data);
+    if (!ar.ok) { put(res, el('p', { class: 'err' }, ar.error)); return; }
+    st.say('Análisis terminado.', 'ok');
+    put(res, renderAnalysis(ar.data));
+  };
+  return { label, run, box: el('div', {}, res, det) };
+}
+
+function diagTab(d, i, st) {
+  const logs = logPanel(d, st);
+  return el('div', {}, componentsSection(d, st), d.platform === 'android' ? testsSection(d, i, st) : null, batterySection(d, st),
+    section('Registro de fallos', el('div', { class: 'actions' }, actionButton(logs.label, logs.run)), logs.box,
+      note(d.platform === 'ios' ? 'Lee el registro en directo y los informes de fallo guardados en el iPhone (reinicios, apps que se cierran), sin borrarlos.' : 'Lee el logcat, el historial de fallos y el motivo del último reinicio.')));
+}
+
+function batterySection(d, st) {
   const box = el('div', { class: 'grid' }, el('p', { class: 'muted' }, 'Leyendo la batería…'));
   const verdict = el('div', {});
   window.api.battery(d.platform, d.serial).then((r) => {
@@ -318,7 +395,7 @@ function diagTab(d, st) {
       : b.healthPercent >= 85 ? ['ok', 'Batería en buen estado.'] : b.healthPercent >= 80 ? ['warnt', 'Batería algo desgastada.'] : ['err', 'Batería degradada (por debajo del 80 %): se recomienda cambiarla.'];
     verdict.replaceChildren(el('p', { class: v[0] }, v[1]));
   });
-  return el('div', {}, box, verdict,
+  return section('Batería', box, verdict,
     el('div', { class: 'actions' }, actionButton('Generar informe para el cliente', (btn) => st.run(btn, () => window.api.report(d.platform, d.serial), (f) => `Informe guardado en ${f} (se abre en el navegador; puedes imprimirlo o guardarlo como PDF).`))),
     note('El informe incluye modelo, versión, nº de serie, almacenamiento y estado de la batería, con espacio para firmas.'));
 }

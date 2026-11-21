@@ -2,7 +2,9 @@
 // Funciones de servicio iPhone/iPad sobre libimobiledevice (sin tocar activación ni bloqueos).
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const tools = require('./tools');
+const analysis = require('./loganalysis');
 const P = require('./parsers');
 const names = require('./devicenames');
 
@@ -79,4 +81,21 @@ async function syslogDump(udid, seconds = 10) {
   });
 }
 
-module.exports = { listDevices, getInfo, screenshot, syslogDump };
+/** Copia (sin borrarlos del iPhone: -k) los informes de fallo y los analiza junto con el syslog. */
+async function crashReports(udid) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mvr-crash-'));
+  try {
+    await tools.run('idevicecrashreport', ['-u', udid, '-k', '-e', dir], { timeout: 90000 }).catch(() => null);
+    const out = [];
+    const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else out.push(f); } };
+    walk(dir);
+    return out.map((f) => ({ name: path.basename(f), text: /panic/i.test(f) ? fs.readFileSync(f, 'utf8').slice(0, 65536) : '' }));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
+async function logAnalysis(udid, syslogText) {
+  const reports = await crashReports(udid).catch(() => []);
+  return analysis.analyzeIos(syslogText, reports);
+}
+
+module.exports = { listDevices, getInfo, screenshot, syslogDump, crashReports, logAnalysis };

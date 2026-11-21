@@ -39,6 +39,7 @@ async function findDevice(name) {
   return null;
 }
 
+const absUrl = (u) => (!u ? null : /^https:\/\//.test(u) ? u : u.startsWith('/') ? `https://www.ifixit.com${u}` : null);
 const img = (o) => (o && (o.standard || o.medium || o['440x330'] || o.thumbnail)) || null;
 
 const KIND = [
@@ -51,7 +52,7 @@ const KIND = [
 function guideKind(title) { const k = KIND.find(([, re]) => re.test(title)); return k ? k[0] : 'other'; }
 
 function summarize(w) {
-  const guides = (w.guides || []).map((g) => ({
+  const guides = (w.guides || []).filter((g) => !(g.flags || []).includes('GUIDE_PREREQ_ONLY')).map((g) => ({
     id: g.guideid, title: g.title, type: g.type, subject: g.subject, difficulty: g.difficulty || null,
     minutes: g.time_required_max ? Math.round(g.time_required_max / 60) : null, url: g.url, image: img(g.image), kind: guideKind(`${g.subject || ''} ${g.title}`),
   }));
@@ -62,7 +63,7 @@ function summarize(w) {
     image: img(w.image), description: w.description || null,
     answersUrl: w.solutions_url || `https://www.ifixit.com/Answers/Device/${encodeURIComponent(String(w.title).replace(/ /g, '_'))}`,
     troubleshootingUrl: `https://www.ifixit.com/Wiki/${encodeURIComponent(`${String(w.title).replace(/ /g, '_')}_Troubleshooting`)}`,
-    documents: (w.documents || []).map((d) => ({ title: d.title || d.filename, url: d.url || d.download_url })).filter((d) => d.url),
+    documents: (w.documents || []).map((d) => ({ title: d.title || d.filename, url: absUrl(d.download_url || d.url) })).filter((d) => d.url),
     guides,
   };
 }

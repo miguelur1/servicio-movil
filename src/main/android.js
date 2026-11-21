@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const tools = require('./tools');
+const analysis = require('./loganalysis');
 const P = require('./parsers');
 const names = require('./devicenames');
 
@@ -92,4 +93,18 @@ async function logcatDump(serial, lines = 2000) {
   return stdout;
 }
 
-module.exports = { listDevices, getInfo, screenshot, installApk, reboot, logcatDump, REBOOT_MODES };
+/** Recoge más registro para el análisis: búfer de fallos, eventos, motivo de arranque e historial (dropbox). */
+async function logAnalysis(serial) {
+  const out = (args, timeout = 30000) => tools.run('adb', ['-s', serial, ...args], { timeout }).then((r) => r.stdout).catch(() => '');
+  const [crash, main, events, reason, dropbox] = await Promise.all([
+    out(['logcat', '-d', '-b', 'crash', '-v', 'time']),
+    out(['logcat', '-d', '-b', 'main,system', '-t', '20000', '-v', 'time']),
+    out(['logcat', '-d', '-b', 'events', '-t', '5000', '-v', 'time']),
+    out(['shell', 'getprop sys.boot.reason; getprop ro.boot.bootreason']),
+    out(['shell', 'dumpsys dropbox']),
+  ]);
+  const br = reason.split(/\r?\n/).map((x) => x.trim()).find(Boolean) || '';
+  return analysis.analyzeAndroid([crash, main, events].join('\n'), { bootReason: br, dropbox });
+}
+
+module.exports = { listDevices, getInfo, screenshot, installApk, reboot, logcatDump, logAnalysis, REBOOT_MODES };
