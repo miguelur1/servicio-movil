@@ -11,6 +11,12 @@ const iosData = require('./ios-data');
 const fs = require('node:fs');
 const drivers = require('./drivers');
 const diagnostics = require('./diagnostics');
+const apps = require('./apps');
+const migration = require('./migrate');
+const deviceArt = require('./deviceart');
+const repair = require('./repair');
+const library = require('./library');
+const settings = require('./settings');
 
 log.initialize();
 let win;
@@ -70,6 +76,7 @@ handle('tools:status', () => Promise.all([
   tools.available('idevice_id', ['--version']),
   tools.available('idevicebackup2', ['--version']),
   tools.available('idevicediagnostics', ['--version']),
+  tools.available('ideviceinstaller', ['--version']),
 ]));
 handle('app:version', () => app.getVersion());
 handle('diag:battery', (platform, serial) => (platform === 'ios' ? diagnostics.iosBattery(serial) : diagnostics.androidBattery(serial)));
@@ -80,6 +87,67 @@ handle('diag:report', async (platform, serial) => {
   shell.openPath(file);
   return file;
 });
+handle('apps:list', (platform, serial, opts) => (platform === 'ios' ? apps.iosList(serial, opts) : apps.androidList(serial, opts)));
+handle('apps:uninstall', async (platform, serial, id, opts = {}) => {
+  const ok = await confirm(`¿Desinstalar ${id}?`, opts.system && platform === 'android'
+    ? 'Es una app del sistema: se quitará solo para el usuario (se puede recuperar con «Recuperar app del sistema»).'
+    : 'Se borrarán la app y sus datos del teléfono.');
+  if (!ok) return null;
+  return platform === 'ios' ? apps.iosUninstall(serial, id) : apps.androidUninstall(serial, id, opts);
+});
+handle('apps:setEnabled', (serial, id, enabled) => apps.androidSetEnabled(serial, id, enabled));
+handle('apps:restoreSystem', (serial, id) => apps.androidRestoreSystemApp(serial, id));
+handle('apps:backup', async (serial, ids) => {
+  const dest = await pickDir('Carpeta donde guardar los APK', path.join(outDir(), 'Apps'));
+  if (!dest) return null;
+  for (const id of ids) await apps.androidBackupApk(serial, id, dest);
+  shell.openPath(dest);
+  return { dest, count: ids.length };
+});
+handle('apps:install', async (platform, serial) => {
+  const ios = platform === 'ios';
+  const r = await dialog.showOpenDialog(win, { title: ios ? 'App para instalar (.ipa)' : 'APK para instalar (varios = una app dividida)', properties: ios ? ['openFile'] : ['openFile', 'multiSelections'], filters: [ios ? { name: 'IPA', extensions: ['ipa'] } : { name: 'APK', extensions: ['apk'] }] });
+  if (r.canceled || !r.filePaths.length) return null;
+  return ios ? apps.iosInstall(serial, r.filePaths[0]) : apps.androidInstall(serial, r.filePaths);
+});
+handle('migrate:plan', (from, to) => migration.plan(from, to));
+handle('migrate:run', async (id, src, dst, opts) => {
+  const ok = await confirm('¿Empezar a pasar los datos?', 'Mantén los dos teléfonos conectados y desbloqueados hasta que termine. En el destino se añaden los datos; no se borra nada.');
+  if (!ok) return null;
+  const work = path.join(outDir(), 'Migraciones', stamp());
+  try {
+    return await migration.migrate(src, dst, opts, work, progressFor(id), (child) => jobs.set(id, child));
+  } finally { jobs.delete(id); }
+});
+const photosDir = () => path.join(app.getPath('userData'), 'fotos-dispositivos');
+handle('art:preview', (platform, serial) => deviceArt.screenPreview(platform, serial));
+handle('art:photo', (name) => deviceArt.getPhoto(photosDir(), name));
+handle('art:setPhoto', async (name) => {
+  const r = await dialog.showOpenDialog(win, { title: `Foto para ${name}`, properties: ['openFile'], filters: [{ name: 'Imagen', extensions: ['png', 'jpg', 'jpeg', 'webp'] }] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  return deviceArt.setPhoto(photosDir(), name, r.filePaths[0]);
+});
+handle('art:removePhoto', (name) => deviceArt.removePhoto(photosDir(), name));
+handle('art:kind', (info) => deviceArt.frameKind(info));
+const libRoot = () => path.join(outDir(), 'Biblioteca');
+handle('repair:device', (name) => repair.deviceInfo(name));
+handle('repair:guide', (id) => repair.guide(id));
+handle('repair:links', (name) => repair.searchLinks(name, settings.load(app.getPath('userData')).schematicSites));
+handle('settings:get', () => settings.load(app.getPath('userData')));
+handle('settings:set', (patch) => settings.save(app.getPath('userData'), patch));
+handle('open:url', (url) => {
+  const u = new URL(url);
+  if (u.protocol !== 'https:') throw new Error('Solo se abren enlaces https');
+  return shell.openExternal(u.toString()).then(() => true);
+});
+handle('library:list', (name) => library.list(libRoot(), name));
+handle('library:add', async (name) => {
+  const r = await dialog.showOpenDialog(win, { title: `Añadir esquemas o manuales de ${name}`, properties: ['openFile', 'multiSelections'] });
+  if (r.canceled || !r.filePaths.length) return null;
+  return library.add(libRoot(), name, r.filePaths);
+});
+handle('library:open', (name, file) => shell.openPath(library.fileFor(libRoot(), name, file)).then((e) => { if (e) throw new Error(e); return true; }));
+handle('library:folder', (name) => { const d = library.dirFor(libRoot(), name); fs.mkdirSync(d, { recursive: true }); return shell.openPath(d).then(() => d); });
 handle('tools:restartAdb', () => diagnostics.restartAdb());
 handle('drivers:google', () => drivers.installGoogleUsbDriver());
 handle('app:platform', () => process.platform);

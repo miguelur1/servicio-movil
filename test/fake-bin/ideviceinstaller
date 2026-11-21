@@ -1,0 +1,17 @@
+#!/bin/sh
+# ideviceinstaller falso: sintaxis nueva (subcomandos) por defecto, antigua con FAKE_II_OLD=1.
+echo "ideviceinstaller $@" >> "${FAKE_LOG:-/dev/null}"
+if [ "$1" = "--help" ]; then
+  if [ -n "$FAKE_II_OLD" ]; then echo "Usage: ideviceinstaller OPTIONS"; echo "  -l, --list-apps"; else echo "Usage: ideviceinstaller [OPTIONS] COMMAND"; echo "  list"; fi
+  exit 0
+fi
+case "$*" in
+  *" list "*|*" -l "*)
+    echo "CFBundleIdentifier, CFBundleShortVersionString, CFBundleDisplayName"
+    echo 'net.whatsapp.WhatsApp, "24.10.1", "WhatsApp"'
+    echo 'com.ejemplo.taller, "1.0", "Taller, mi app"' ;;
+  *"install "*|*" -i "*)
+    case "$*" in *mala.ipa*) echo "ERROR: Install failed. Got error \"ApplicationVerificationFailed\"" >&2; exit 1 ;; esac
+    echo "Install: Complete" ;;
+  *"uninstall "*|*" -U "*) echo "Uninstall: Complete" ;;
+esac

@@ -1,3 +1,4 @@
+[hidden] { display:none !important; }
 :root { --bg:#0f1419; --panel:#161c23; --line:#26303b; --text:#e6edf3; --muted:#8b98a5; --accent:#3b82f6; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; }
 * { box-sizing: border-box; }
 body { margin:0; font:14px/1.45 "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; }
@@ -46,3 +47,40 @@ pre { background:#0a0d11; border:1px solid var(--line); border-radius:8px; paddi
 .small-btn { padding:4px 10px; font-size:12.5px; }
 .bar > i.warn { background:var(--warn); } .bar > i.bad { background:var(--err); } .warnt { color:var(--warn); }
 footer { padding:6px 18px; font-size:11.5px; color:var(--muted); border-top:1px solid var(--line); background:var(--panel); text-align:right; }
+.apps li { grid-template-columns:24px 1fr auto; } .rowbtns { display:flex; gap:6px; }
+.mini { padding:3px 8px; font-size:12px; } .danger { border-color:#7f1d1d !important; color:#fca5a5 !important; }
+.wide { width:100%; margin:4px 0 8px; }
+select.search { min-width:320px; }
+.devhead { display:flex; gap:20px; align-items:flex-start; }
+.devtitle { padding-top:6px; } .devtitle h3 { font-size:24px; }
+.art { width:128px; flex:none; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.art .photo { max-width:128px; max-height:220px; object-fit:contain; border-radius:10px; }
+.artcap { text-align:center; min-height:16px; font-size:11px; }
+.artbtns { display:flex; flex-wrap:wrap; gap:4px; justify-content:center; }
+/* Silueta del teléfono (vista frontal) */
+.phone { position:relative; width:104px; height:212px; border-radius:20px; background:#05070a; border:3px solid #3a4452; box-shadow:0 0 0 1px #0b0f14, 0 10px 24px rgba(0,0,0,.45); padding:5px; }
+.phone .screen { position:relative; width:100%; height:100%; border-radius:15px; overflow:hidden; background:linear-gradient(160deg,#1e3a8a,#0ea5e9 55%,#22c55e); }
+.phone .screen img { width:100%; height:100%; object-fit:cover; display:block; }
+.phone .clock { position:absolute; top:34%; width:100%; text-align:center; font-size:22px; font-weight:300; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.4); }
+.phone::after { content:''; position:absolute; z-index:2; }
+.phone.android::after, .phone.pixel::after { width:8px; height:8px; border-radius:50%; background:#000; top:11px; left:calc(50% - 4px); box-shadow:0 0 0 1.5px #1f2937; }
+.phone.pixel { border-color:#556070; border-radius:22px; }
+.phone.iphone-island::after { width:34px; height:10px; border-radius:6px; background:#000; top:10px; left:calc(50% - 17px); }
+.phone.iphone-notch::after { width:46px; height:11px; border-radius:0 0 8px 8px; background:#000; top:5px; left:calc(50% - 23px); }
+.phone.iphone-island, .phone.iphone-notch { border-color:#8b95a3; border-radius:22px; }
+.phone.iphone-home { padding:24px 5px 30px; border-radius:18px; border-color:#9aa4b1; background:#11151b; }
+.phone.iphone-home .screen { border-radius:2px; }
+.phone.iphone-home::after { width:18px; height:18px; border-radius:50%; border:2px solid #4b5563; bottom:5px; left:calc(50% - 11px); }
+.phone.ipad { width:150px; height:200px; border-radius:14px; padding:9px; border-color:#8b95a3; }
+.phone.ipad .screen { border-radius:6px; }
+.art:has(.phone.ipad) { width:160px; }
+/* Reparación */
+.linkbtn { background:none; border:0; color:#93c5fd; padding:0; cursor:pointer; text-decoration:underline; font:inherit; }
+.ifxhead { display:flex; gap:16px; align-items:flex-start; } .ifximg { width:180px; border-radius:8px; flex:none; }
+.guides { list-style:none; padding:0; margin:6px 0 12px; display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:8px; }
+.guides li { display:grid; grid-template-columns:72px 1fr; gap:10px; align-items:center; padding:6px; border:1px solid var(--line); border-radius:8px; cursor:pointer; }
+.guides li:hover { border-color:#3b82f6; } .guides img, .guides .noimg { width:72px; height:54px; object-fit:cover; border-radius:6px; background:#0a0d11; }
+h5 { margin:12px 0 4px; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.step { border-top:1px solid var(--line); padding:10px 0; } .stepimgs { display:flex; gap:8px; flex-wrap:wrap; }
+.stepimgs img { width:min(300px,100%); border-radius:6px; }
+.step li.caution { color:var(--warn); } .step li.note { color:#93c5fd; }

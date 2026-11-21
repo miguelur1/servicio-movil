@@ -1,6 +1,17 @@
 #!/bin/sh
 echo "$@" >> "${FAKE_LOG:-/dev/null}"
 case "$*" in
+  *"shell am start -a android.intent.action.VIEW -t text/x-vcard"*)
+    if [ -n "$FAKE_NO_IMPORT" ]; then echo "Error: Activity not started, unable to resolve Intent"; else echo "Starting: Intent { act=android.intent.action.VIEW }"; fi ;;
+  *"shell pm list packages -f --show-versioncode -3"*) printf 'package:/data/app/~~a==/com.whatsapp-1/base.apk=com.whatsapp versionCode:241234\npackage:/data/app/com.ejemplo.app-2/base.apk=com.ejemplo.app versionCode:7\n' ;;
+  *"shell pm list packages -f --show-versioncode -s"*) printf 'package:/system/app/YouTube/YouTube.apk=com.google.android.youtube versionCode:1\n' ;;
+  *"shell pm list packages -d -3"*) printf 'package:com.ejemplo.app\n' ;;
+  *"shell pm list packages -d -s"*) : ;;
+  *"shell pm disable-user --user 0 "*) echo "Package ${4##* } new state: disabled-user" ;;
+  *"shell pm enable "*) echo "Package ${4##* } new state: enabled" ;;
+  *"shell pm uninstall -k --user 0 "*) echo "Success" ;;
+  *"shell cmd package install-existing "*) echo "Package com.google.android.youtube installed for user: 0" ;;
+  *" uninstall com."*) echo "Success" ;;
   *"shell for f in cycle_count"*)
     if [ -n "$FAKE_NO_SYS" ]; then exit 0; fi
     printf 'cycle_count=412\ncharge_full=3891000\ncharge_full_design=4614000\n' ;;

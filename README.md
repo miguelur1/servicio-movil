@@ -26,6 +26,10 @@ Compatible con cualquier Android con ADB (Samsung, Xiaomi, Motorola… y **Googl
 | Mensajes → .csv | ✓ SMS (si el sistema lo permite) | ✓ SMS e iMessage (desde la copia) |
 | Explorador de archivos | ✓ almacenamiento del teléfono | ✓ archivos de la copia (WhatsApp, notas, apps…) |
 | Salud de batería (ciclos, capacidad real vs. diseño) e informe para el cliente | ✓ (si el fabricante la expone) | ✓ |
+| Gestor de apps: ver, instalar, desinstalar, copiar | ✓ APK/split APK; desactivar y recuperar apps del sistema | ✓ IPA firmados para el dispositivo (ideviceinstaller) |
+| Pasar datos de un móvil a otro (los dos conectados) | Android→Android: fotos, archivos, contactos, apps | iPhone→Android: fotos y contactos · iPhone→iPhone: copia completa. Android→iPhone: Apple no lo permite por cable (se indica «Pasar a iOS») |
+| Imagen del dispositivo: silueta por modelo, pantalla en directo y foto propia | ✓ | ✓ (pantalla en directo: iOS 17+ requiere modo desarrollador) |
+| Reparación: guías paso a paso y problemas típicos (iFixit, CC BY-NC-SA), búsqueda de esquemas en tus sitios, biblioteca propia por modelo | ✓ | ✓ |
 | Instalar APK, reiniciar a recovery/fastboot | ✓ | — |
 | Auto-actualización desde GitHub Releases | ✓ | ✓ |
 

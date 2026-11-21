@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data: https://*.cdn.ifixit.com https://*.ifixit.com">
   <title>MVR Servicio Móvil</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -19,6 +19,7 @@
         <button id="refresh" title="Buscar de nuevo">Actualizar</button>
       </div>
       <ul id="devices"></ul>
+      <button id="openMigrate" class="ghost wide">⇄ Pasar datos de un móvil a otro</button>
       <p id="empty" class="muted">Conecta un teléfono por USB. En Android activa «Depuración USB»; en iPhone pulsa «Confiar».</p>
       <details id="helpBox">
         <summary>¿No aparece tu teléfono?</summary>

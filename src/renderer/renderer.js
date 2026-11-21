@@ -18,11 +18,13 @@ const STATE = { device: 'Conectado', unauthorized: 'Autoriza en el teléfono', o
 
 let selected = null; // {platform, serial, state}
 let lastKey = '';
+let lastDevices = [];
 
 async function refresh() {
   const r = await window.api.listDevices();
   if (!r.ok) return;
   const { devices } = r.data;
+  lastDevices = devices;
   const key = JSON.stringify(devices);
   if (key === lastKey) return;
   lastKey = key;
@@ -92,6 +94,45 @@ const section = (title, ...kids) => el('div', { class: 'section' }, el('h4', {},
 const note = (t) => el('p', { class: 'muted small' }, t);
 const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
 
+// ── Imagen del dispositivo ──────────────────────────────────────────────────
+function deviceArt(d, info, title) {
+  const name = info.marketName || info.model || d.model || d.serial;
+  const wrap = el('div', { class: 'art' });
+  const frame = el('div', { class: 'phone' });
+  const screen = el('div', { class: 'screen' });
+  const img = el('img', { alt: '' });
+  img.hidden = true;
+  const clock = el('div', { class: 'clock' }, new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }));
+  screen.append(img, clock);
+  frame.append(screen);
+  const photo = el('img', { class: 'photo', alt: name }); photo.hidden = true;
+  const caption = el('div', { class: 'artcap muted small' }, '');
+  const btnShot = el('button', { class: 'ghost mini' }, '↻ Pantalla');
+  const btnPhoto = el('button', { class: 'ghost mini' }, 'Poner foto');
+  const btnDel = el('button', { class: 'ghost mini' }, 'Quitar foto'); btnDel.hidden = true;
+  const showPhoto = (url) => {
+    photo.hidden = !url; frame.hidden = !!url; btnDel.hidden = !url; btnShot.hidden = !!url;
+    if (url) photo.src = url;
+  };
+  const loadScreen = async () => {
+    btnShot.disabled = true; caption.textContent = 'Leyendo pantalla…';
+    const r = await window.api.artPreview(d.platform, d.serial);
+    btnShot.disabled = false;
+    if (r.ok && r.data) {
+      img.onload = () => { img.hidden = false; clock.hidden = true; caption.textContent = 'Pantalla en directo'; };
+      img.onerror = () => { caption.textContent = ''; };
+      img.src = r.data;
+    } else caption.textContent = d.platform === 'ios' ? 'Pantalla no disponible (iOS 17+: modo desarrollador)' : 'Pantalla no disponible';
+  };
+  btnShot.addEventListener('click', loadScreen);
+  btnPhoto.addEventListener('click', async () => { const r = await window.api.artSetPhoto(name); if (r.ok && r.data) showPhoto(r.data); });
+  btnDel.addEventListener('click', async () => { await window.api.artRemovePhoto(name); showPhoto(null); loadScreen(); });
+  window.api.artKind({ platform: info.platform, model: info.model, marketName: info.marketName }).then((r) => { frame.classList.add(r.ok ? r.data : 'android'); });
+  window.api.artPhoto(name).then((r) => { if (r.ok && r.data) showPhoto(r.data); else loadScreen(); });
+  wrap.append(frame, photo, caption, el('div', { class: 'artbtns' }, btnShot, btnPhoto, btnDel));
+  return wrap;
+}
+
 async function select(d) {
   selected = d; lastKey = ''; refresh();
   const det = $('#detail');
@@ -122,10 +163,12 @@ async function select(d) {
   const tabs = [
     ['Información', () => infoTab(d, i, st)],
     ['Diagnóstico', () => diagTab(d, st)],
+    ['Apps', () => appsTab(d, st)],
     ['Copia de seguridad', () => backupTab(d, model, st)],
     ['Fotos', () => photosTab(d, model, st)],
     ['Contactos y mensajes', () => contactsTab(d, model, st)],
     [ios ? 'Archivos de la copia' : 'Archivos', () => (ios ? iosFilesTab(d, st) : filesTab(d, st))],
+    ['Reparación', () => repairTab(i.marketName || i.model || d.model || d.serial, st)],
   ];
   const body = el('div', { class: 'tabbody' });
   const bar = el('div', { class: 'tabs' });
@@ -136,8 +179,90 @@ async function select(d) {
     body.replaceChildren(tabs[idx][1]());
   };
   tabs.forEach(([label], idx) => { const b = el('button', { class: 'tab' }, label); b.addEventListener('click', () => show(idx)); bar.append(b); });
-  det.replaceChildren(el('h3', {}, title), el('div', { class: 'serial muted' }, `${i.platform === 'ios' ? (i.model || '') : (i.model || '')} · ${d.serial}`), bar, body, st.box);
+  const head = el('div', { class: 'devhead' }, deviceArt(d, i, title),
+    el('div', { class: 'devtitle' }, el('h3', {}, title), el('div', { class: 'serial muted' }, `${i.model || ''} · ${d.serial}`),
+      el('div', { class: 'muted small' }, i.platform === 'ios' ? `iOS ${i.iosVersion || '—'}` : `Android ${i.androidVersion || '—'}`, i.battery && i.battery.level != null ? ` · batería ${i.battery.level} %` : '')));
+  det.replaceChildren(head, bar, body, st.box);
   show(0);
+}
+
+// ── Reparación: guías de iFixit, búsquedas y biblioteca propia ──────────────
+const DIFF = { 'Very easy': 'Muy fácil', Easy: 'Fácil', Moderate: 'Moderada', Difficult: 'Difícil', 'Very difficult': 'Muy difícil' };
+const KINDS = { screen: 'Pantalla', battery: 'Batería', charging: 'Carga / conector', back: 'Tapa trasera', camera: 'Cámara', other: 'Otras reparaciones' };
+const link = (label, url, cls = 'linkbtn') => el('button', { class: cls, onclick: () => window.api.openUrl(url) }, label);
+
+function repairTab(name, st) {
+  const wrap = el('div', {});
+  const ifx = el('div', {}, el('p', { class: 'muted' }, `Buscando «${name}» en iFixit…`));
+  const linksBox = el('div', { class: 'actions' });
+  const lib = el('div', {});
+  const sitesInput = el('textarea', { class: 'search wide', rows: '3', placeholder: 'Un dominio por línea, p. ej. foro-de-reparaciones.com' });
+
+  const loadLinks = () => window.api.repairLinks(name).then((r) => { if (r.ok) linksBox.replaceChildren(...r.data.map((l) => link(l.label, l.url, 'act ghost'))); });
+  const loadLib = () => window.api.libraryList(name).then((r) => {
+    if (!r.ok) { lib.replaceChildren(el('p', { class: 'err' }, r.error)); return; }
+    const files = r.data.files;
+    lib.replaceChildren(files.length
+      ? el('ul', { class: 'files' }, files.map((f) => el('li', {}, '📄', el('span', { class: 'dir', onclick: () => window.api.libraryOpen(name, f.name) }, f.name), el('span', { class: 'muted small' }, fmtBytes(f.size)))))
+      : note('Aún no tienes documentos para este modelo. Añade aquí tus esquemas, manuales o fotos de placa y aparecerán solos cada vez que conectes este modelo.'));
+  });
+
+  const showDevice = (r) => {
+    if (!r.ok) { ifx.replaceChildren(el('p', { class: 'err' }, `No se pudo consultar iFixit: ${r.error}`), note('Comprueba la conexión a internet.')); return; }
+    const x = r.data;
+    if (!x.found) { ifx.replaceChildren(note(`iFixit no tiene una página para «${name}». Usa las búsquedas de abajo.`)); return; }
+    const head = el('div', { class: 'ifxhead' },
+      x.image ? el('img', { src: x.image, alt: '', class: 'ifximg' }) : null,
+      el('div', {}, el('h4', {}, x.title), x.description ? el('p', { class: 'muted small' }, x.description) : null,
+        el('div', { class: 'actions' }, link('Problemas típicos y soluciones', x.troubleshootingUrl, 'act'), link('Preguntas y respuestas', x.answersUrl, 'act ghost'), link('Ver en iFixit', x.url, 'act ghost'))));
+    const groups = el('div', {});
+    if (!x.guides.length) groups.append(note('No hay guías paso a paso publicadas para este modelo.'));
+    for (const k of Object.keys(KINDS)) {
+      const gs = x.guides.filter((g) => g.kind === k);
+      if (!gs.length) continue;
+      groups.append(el('h5', {}, KINDS[k]), el('ul', { class: 'guides' }, gs.map((g) => el('li', { onclick: () => openGuide(g.id) },
+        g.image ? el('img', { src: g.image, alt: '' }) : el('div', { class: 'noimg' }),
+        el('div', {}, el('div', {}, g.title), el('div', { class: 'muted small' }, [DIFF[g.difficulty] || g.difficulty, g.minutes ? `${g.minutes} min` : null].filter(Boolean).join(' · ')))))));
+    }
+    const docs = x.documents.length ? section('Documentos públicos en iFixit', el('ul', { class: 'files' }, x.documents.map((d) => el('li', {}, '📄', el('span', { class: 'dir', onclick: () => window.api.openUrl(d.url) }, d.title), el('span', {}))))) : null;
+    ifx.replaceChildren(head, section('Guías paso a paso', groups), docs);
+  };
+
+  const openGuide = async (id) => {
+    const view = el('div', {}, el('p', { class: 'muted' }, 'Cargando guía…'));
+    wrap.replaceChildren(el('button', { class: 'ghost', onclick: () => render() }, '← Volver'), view);
+    const r = await window.api.repairGuide(id);
+    if (!r.ok) { view.replaceChildren(el('p', { class: 'err' }, r.error)); return; }
+    const g = r.data;
+    view.replaceChildren(
+      el('h3', {}, g.title),
+      el('p', { class: 'muted small' }, [DIFF[g.difficulty] || g.difficulty, g.minutes ? `hasta ${g.minutes} min` : null, g.author ? `autor: ${g.author}` : null].filter(Boolean).join(' · ')),
+      g.intro ? el('p', {}, g.intro) : null,
+      g.tools.length ? section('Herramientas', el('ul', {}, g.tools.map((t) => el('li', {}, t.name)))) : null,
+      g.parts.length ? section('Piezas', el('ul', {}, g.parts.map((p) => el('li', {}, `${p.quantity} × ${p.name}`)))) : null,
+      ...g.steps.map((s, k) => el('div', { class: 'step' },
+        el('h5', {}, `Paso ${k + 1}${s.title ? ` · ${s.title}` : ''}`),
+        el('div', { class: 'stepimgs' }, s.images.map((u) => el('img', { src: u, alt: '' }))),
+        el('ul', {}, s.lines.map((l) => { const li = el('li', { class: l.kind }, l.text); li.style.marginLeft = `${l.level * 16}px`; return li; })))),
+      el('p', { class: 'muted small' }, 'Contenido de iFixit con licencia CC BY-NC-SA. ', link('Abrir la guía original', g.url)));
+  };
+
+  const render = () => {
+    wrap.replaceChildren(ifx,
+      section('Esquemas, vídeos y foros', linksBox,
+        el('details', {}, el('summary', { class: 'muted small' }, 'Tus sitios de esquemas (Ajustes)'), sitesInput,
+          actionButton('Guardar sitios', (btn) => st.run(btn, () => window.api.settingsSet({ schematicSites: sitesInput.value.split(/\s+/) }), (x) => { sitesInput.value = x.schematicSites.join('\n'); loadLinks(); return `Guardados ${plural(x.schematicSites.length, 'sitio', 'sitios')}.`; }), true)),
+        note('Los esquemas eléctricos de los fabricantes no son públicos: la app busca en los sitios que tú indiques y abre los resultados en el navegador, sin descargar nada por su cuenta.')),
+      section('Tu biblioteca para este modelo', lib, el('div', { class: 'actions' },
+        actionButton('Añadir documentos…', (btn) => st.run(btn, () => window.api.libraryAdd(name), (x) => { loadLib(); return x ? 'Documentos añadidos.' : 'Cancelado.'; })),
+        actionButton('Abrir carpeta', (btn) => st.run(btn, () => window.api.libraryFolder(name), (dir) => `Carpeta: ${dir}`), true))));
+  };
+
+  render();
+  window.api.repairDevice(name).then(showDevice);
+  window.api.settingsGet().then((r) => { if (r.ok) sitesInput.value = r.data.schematicSites.join('\n'); });
+  loadLinks(); loadLib();
+  return wrap;
 }
 
 function infoTab(d, i, st) {
@@ -196,6 +321,55 @@ function diagTab(d, st) {
   return el('div', {}, box, verdict,
     el('div', { class: 'actions' }, actionButton('Generar informe para el cliente', (btn) => st.run(btn, () => window.api.report(d.platform, d.serial), (f) => `Informe guardado en ${f} (se abre en el navegador; puedes imprimirlo o guardarlo como PDF).`))),
     note('El informe incluye modelo, versión, nº de serie, almacenamiento y estado de la batería, con espacio para firmas.'));
+}
+
+function appsTab(d, st) {
+  const ios = d.platform === 'ios';
+  const sys = el('input', { type: 'checkbox' });
+  const filter = el('input', { type: 'search', class: 'search', placeholder: 'Filtrar por nombre o identificador…' });
+  const list = el('ul', { class: 'files apps' });
+  const chosen = new Set();
+  let all = [];
+  const render = () => {
+    const q = filter.value.trim().toLowerCase();
+    const rows = all.filter((a) => !q || a.id.toLowerCase().includes(q) || String(a.name).toLowerCase().includes(q)).map((a) => {
+      const cb = el('input', { type: 'checkbox' });
+      cb.checked = chosen.has(a.id);
+      cb.addEventListener('change', () => (cb.checked ? chosen.add(a.id) : chosen.delete(a.id)));
+      const btns = el('span', { class: 'rowbtns' });
+      const mini = (label, fn, cls = '') => { const b = el('button', { class: `ghost mini act ${cls}` }, label); b.addEventListener('click', () => fn(b)); btns.append(b); };
+      if (!ios) {
+        mini(a.enabled ? 'Desactivar' : 'Activar', (b) => st.run(b, () => window.api.appsSetEnabled(d.serial, a.id, !a.enabled), (en) => { a.enabled = en; render(); return `${a.id} ${en ? 'activada' : 'desactivada'}.`; }));
+      }
+      mini('Desinstalar', (b) => st.run(b, () => window.api.appsUninstall(d.platform, d.serial, a.id, { system: a.system }), () => { all = all.filter((x) => x !== a); render(); return `${a.id} desinstalada.`; }), 'danger');
+      const meta = ios ? `${a.id}${a.version ? ` · v${a.version}` : ''}` : `${a.versionCode ? `versión ${a.versionCode}` : ''}${a.enabled ? '' : ' · desactivada'}`;
+      return el('li', {}, cb, el('div', {}, el('div', {}, a.name), el('div', { class: 'muted small' }, ios || a.name === a.id ? meta : `${a.id} · ${meta}`)), btns);
+    });
+    list.replaceChildren(...(rows.length ? rows : [el('li', { class: 'muted' }, 'Sin apps')]));
+  };
+  const load = async () => {
+    list.replaceChildren(el('li', { class: 'muted' }, 'Cargando apps…'));
+    chosen.clear();
+    const r = await window.api.appsList(d.platform, d.serial, { system: sys.checked });
+    if (!r.ok) { list.replaceChildren(el('li', { class: 'err' }, r.error)); return; }
+    all = r.data; render();
+  };
+  sys.addEventListener('change', load);
+  filter.addEventListener('input', render);
+  const top = el('div', { class: 'actions' },
+    actionButton(ios ? 'Instalar .ipa…' : 'Instalar APK…', (b) => st.run(b, () => window.api.appsInstall(d.platform, d.serial), (n) => (n === null ? 'Cancelado.' : 'App instalada.')).then(load)),
+    ios ? null : actionButton('Copiar APK seleccionados', (b) => (chosen.size ? st.run(b, () => window.api.appsBackup(d.serial, [...chosen]), (x) => `${plural(x.count, 'app copiada', 'apps copiadas')} en ${x.dest}`) : st.say('Marca primero alguna app.')), true),
+    ios ? null : actionButton('Recuperar app del sistema…', (b) => {
+      const id = filter.value.trim();
+      if (!/^[A-Za-z][\w]*(\.[A-Za-z0-9_]+)+$/.test(id)) { st.say('Escribe en el filtro el identificador exacto (p. ej. com.google.android.youtube) y pulsa de nuevo.'); return; }
+      st.run(b, () => window.api.appsRestoreSystem(d.serial, id), () => `${id} recuperada.`).then(load);
+    }, true));
+  load();
+  return el('div', {}, top,
+    el('div', { class: 'actions' }, filter, el('label', { class: 'check' }, sys, ' Mostrar apps del sistema')),
+    ios ? note('Solo se pueden instalar .ipa firmados para este iPhone (desarrollador o empresa); iOS no permite instalar apps de la App Store copiadas.')
+      : note('Las apps del sistema no se borran de verdad sin root: se quitan para el usuario y se pueden recuperar. «Desactivar» es la opción más segura.'),
+    list);
 }
 
 function backupTab(d, model, st) {
@@ -308,6 +482,58 @@ function iosFilesTab(d, st) {
       actionButton('Extraer seleccionados', (btn) => (chosen.size ? st.run(btn, () => window.api.iosExtract(d.serial, [...chosen]), (x) => `${plural(x.count, 'archivo extraído', 'archivos extraídos')} en ${x.dest}`) : st.say('Marca primero algún archivo.')))),
     list);
 }
+
+// ── Migración de móvil a móvil ──────────────────────────────────────────────
+function migrateView() {
+  selected = null; lastKey = ''; refresh();
+  const det = $('#detail');
+  const st = statusBox();
+  const ready = () => lastDevices.filter((d) => d.state === 'device');
+  const label = (d) => `${d.platform === 'ios' ? 'iPhone' : 'Android'} · ${d.marketName || d.model || d.serial}`;
+  const selFrom = el('select', { class: 'search' }); const selTo = el('select', { class: 'search' });
+  const fill = () => {
+    const devs = ready();
+    for (const [sel, idx] of [[selFrom, 0], [selTo, 1]]) {
+      const prev = sel.value;
+      sel.replaceChildren(...devs.map((d) => el('option', { value: d.serial }, label(d))));
+      if (devs.some((d) => d.serial === prev)) sel.value = prev; else if (devs[idx]) sel.value = devs[idx].serial;
+    }
+  };
+  const opts = { photos: ['Fotos y vídeos', true], files: ['Archivos (Descargas, Documentos, Música)', true], contacts: ['Contactos', true], apps: ['Apps (sin sus datos)', false] };
+  const boxes = Object.fromEntries(Object.entries(opts).map(([k, [t, on]]) => { const cb = el('input', { type: 'checkbox' }); cb.checked = on; return [k, { cb, row: el('label', { class: 'check' }, cb, ` ${t}`) }]; }));
+  const info = el('p', { class: 'muted small' });
+  const go = actionButton('Empezar', () => {});
+  const update = async () => {
+    const devs = ready();
+    const a = devs.find((d) => d.serial === selFrom.value); const b = devs.find((d) => d.serial === selTo.value);
+    if (devs.length < 2) { info.textContent = 'Conecta los dos teléfonos (origen y destino) a la vez.'; go.disabled = true; return; }
+    if (!a || !b || a.serial === b.serial) { info.textContent = 'Elige dos teléfonos distintos.'; go.disabled = true; return; }
+    const r = await window.api.migratePlan(a.platform, b.platform);
+    const p = r.ok ? r.data : { ok: false, reason: r.error };
+    for (const [k, { row }] of Object.entries(boxes)) row.hidden = !p.ok || !p.items.includes(k);
+    go.disabled = !p.ok;
+    info.textContent = !p.ok ? p.reason : p.items.includes('full')
+      ? 'iPhone a iPhone: se hace una copia completa del origen y se restaura en el destino (todo: fotos, WhatsApp, ajustes, apps). En el destino hay que desactivar «Buscar mi iPhone».'
+      : a.platform === 'ios' ? 'Del iPhone se sacan fotos y contactos de su copia de seguridad y se pasan al Android.' : 'Se copian los datos al PC y de ahí al teléfono de destino.';
+  };
+  selFrom.addEventListener('change', update); selTo.addEventListener('change', update);
+  const swap = el('button', { class: 'ghost' }, '⇅ Intercambiar');
+  swap.addEventListener('click', () => { const v = selFrom.value; selFrom.value = selTo.value; selTo.value = v; update(); });
+  go.addEventListener('click', () => {
+    const devs = ready();
+    const a = devs.find((d) => d.serial === selFrom.value); const b = devs.find((d) => d.serial === selTo.value);
+    const o = Object.fromEntries(Object.entries(boxes).map(([k, { cb, row }]) => [k, cb.checked && !row.hidden]));
+    st.run(go, (id) => window.api.migrate(id, { platform: a.platform, serial: a.serial }, { platform: b.platform, serial: b.serial }, o),
+      (x) => `Hecho: ${x.hecho.join(', ')}.${x.avisos.length ? ` ${x.avisos.join(' ')}` : ''}`);
+  });
+  fill(); update();
+  const timer = setInterval(() => { if (!document.body.contains(selFrom)) { clearInterval(timer); return; } if (!st.running) { fill(); update(); } }, 3000);
+  det.replaceChildren(el('h3', {}, 'Pasar datos de un móvil a otro'),
+    section('Origen y destino', el('div', { class: 'actions' }, el('span', {}, 'De'), selFrom), el('div', { class: 'actions' }, el('span', {}, 'A'), selTo, swap)),
+    section('Qué pasar', ...Object.values(boxes).map((x) => x.row), info, el('div', { class: 'actions' }, go)),
+    st.box);
+}
+$('#openMigrate').addEventListener('click', migrateView);
 
 async function loadTools() {
   const r = await window.api.toolsStatus();
