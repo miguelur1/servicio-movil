@@ -28,6 +28,7 @@ async function refresh() {
   lastKey = key;
   const list = $('#devices'); list.replaceChildren();
   $('#empty').hidden = devices.length > 0;
+  if (!devices.length) $('#helpBox').open = true;
   for (const d of devices) {
     const li = el('li', { class: selected && selected.serial === d.serial ? 'sel' : '', onclick: () => select(d) },
       el('div', {}, d.platform === 'ios' ? 'iPhone/iPad' : 'Android', el('span', { class: `badge ${d.state}` }, STATE[d.state] || d.state)),
@@ -294,6 +295,14 @@ window.api.onUpdate((s) => {
   const text = { checking: null, none: null, dev: null, available: `Descargando versión ${s.version}…`, downloading: `Actualización ${s.percent}%`, ready: `Versión ${s.version} lista`, error: null }[s.status];
   u.hidden = !text; u.replaceChildren(text || '');
   if (s.status === 'ready') u.append(' ', el('button', { onclick: () => window.api.installUpdate() }, 'Reiniciar y actualizar'));
+});
+
+window.api.platform().then((r) => { if (r.ok && r.data !== 'win32') $('#pixelDriver').hidden = true; });
+$('#installDriver').addEventListener('click', async () => {
+  const b = $('#installDriver'); const m = $('#driverMsg');
+  b.disabled = true; m.className = 'muted'; m.textContent = ' Acepta el aviso de administrador de Windows…';
+  const r = await window.api.installGoogleDriver();
+  b.disabled = false; m.className = r.ok ? 'ok' : 'err'; m.textContent = ` ${r.ok ? r.data : r.error}`;
 });
 
 $('#refresh').addEventListener('click', () => { lastKey = ''; refresh(); });

@@ -9,6 +9,7 @@ const updater = require('./updater');
 const androidData = require('./android-data');
 const iosData = require('./ios-data');
 const fs = require('node:fs');
+const drivers = require('./drivers');
 
 log.initialize();
 let win;
@@ -68,6 +69,8 @@ handle('tools:status', () => Promise.all([
   tools.available('idevice_id', ['--version']),
 ]));
 handle('app:version', () => app.getVersion());
+handle('drivers:google', () => drivers.installGoogleUsbDriver());
+handle('app:platform', () => process.platform);
 handle('update:check', () => updater.check());
 handle('update:install', () => updater.quitAndInstall());
 

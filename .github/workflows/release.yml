@@ -35,6 +35,7 @@ jobs:
         shell: bash
         run: |
           resources/bin/platform-tools/adb.exe version
+          test -f resources/bin/google-usb-driver/android_winusb.inf && grep -c "18D1" resources/bin/google-usb-driver/android_winusb.inf
           resources/bin/libimobiledevice/idevice_id.exe --version
           resources/bin/libimobiledevice/idevicebackup2.exe --version
           resources/bin/libimobiledevice/idevice_id.exe -l || true

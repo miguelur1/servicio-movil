@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('api', {
   installApk: (serial) => ipcRenderer.invoke('android:install', serial),
   reboot: (serial, mode, fromFastboot) => ipcRenderer.invoke('android:reboot', serial, mode, fromFastboot),
   toolsStatus: () => ipcRenderer.invoke('tools:status'),
+  installGoogleDriver: () => ipcRenderer.invoke('drivers:google'),
+  platform: () => ipcRenderer.invoke('app:platform'),
   version: () => ipcRenderer.invoke('app:version'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   installUpdate: () => ipcRenderer.invoke('update:install'),

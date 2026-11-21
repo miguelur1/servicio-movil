@@ -59,6 +59,23 @@ async function platformTools() {
   if (!fs.existsSync(path.join(BIN, 'platform-tools', 'adb.exe'))) throw new Error('adb.exe no está en el zip de platform-tools');
 }
 
+// Driver USB oficial de Google (necesario en Windows para Pixel/Nexus en ADB y Fastboot).
+async function googleUsbDriver() {
+  let name = 'usb_driver_r13-windows.zip';
+  try {
+    const xml = (await get('https://dl.google.com/android/repository/addon2-1.xml')).toString('utf8');
+    const all = [...xml.matchAll(/usb_driver_r(\d+)-windows\.zip/g)].sort((a, b) => Number(b[1]) - Number(a[1]));
+    if (all.length) name = all[0][0];
+  } catch (e) { console.warn(`No se pudo leer el índice del SDK (${e.message}); uso ${name}`); }
+  const zip = await download(`https://dl.google.com/android/repository/${name}`, 'usb_driver.zip');
+  const dest = path.join(BIN, 'google-usb-driver');
+  fs.rmSync(dest, { recursive: true, force: true });
+  unzip(zip, BIN); // el zip trae la carpeta usb_driver/
+  fs.renameSync(path.join(BIN, 'usb_driver'), dest);
+  if (!fs.existsSync(path.join(dest, 'android_winusb.inf'))) throw new Error('android_winusb.inf no está en el zip del driver USB de Google');
+  console.log(`✓ Driver USB de Google (${name})`);
+}
+
 async function libimobiledevice() {
   const releases = await get(IMD_RELEASES, { json: true });
   let asset = null;
@@ -82,6 +99,7 @@ async function libimobiledevice() {
 
 (async () => {
   await platformTools();
+  await googleUsbDriver();
   // En Windows con MSYS2 (runner de GitHub) se usa libimobiledevice actual vía
   // scripts/bundle-libimobiledevice.sh. Este build antiguo (1.2.1) queda solo como respaldo.
   if (process.argv.includes('--skip-ios')) return console.log(`✓ platform-tools listo en ${BIN}`);

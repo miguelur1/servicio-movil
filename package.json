@@ -1,7 +1,7 @@
 {
   "name": "servicio-movil",
   "productName": "Servicio Móvil",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Herramienta de servicio técnico para Android e iPhone en Windows (ADB, Fastboot, libimobiledevice).",
   "main": "src/main/main.js",
   "author": "Miguel",

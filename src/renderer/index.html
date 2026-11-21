@@ -20,6 +20,18 @@
       </div>
       <ul id="devices"></ul>
       <p id="empty" class="muted">Conecta un teléfono por USB. En Android activa «Depuración USB»; en iPhone pulsa «Confiar».</p>
+      <details id="helpBox">
+        <summary>¿No aparece tu teléfono?</summary>
+        <ol class="help">
+          <li><b>Android / Google Pixel:</b> Ajustes → Información del teléfono → toca 7 veces «Número de compilación». Luego Ajustes → Sistema → Opciones para desarrolladores → activa «Depuración USB».</li>
+          <li>Al conectar, acepta en el teléfono «¿Permitir depuración USB?».</li>
+          <li id="pixelDriver"><b>Pixel en Windows:</b> instala el driver USB de Google (una sola vez).
+            <button id="installDriver" class="ghost">Instalar driver de Google</button>
+            <span id="driverMsg" class="muted"></span></li>
+          <li><b>iPhone:</b> instala «Dispositivos Apple» (Microsoft Store) o iTunes, desbloquea el iPhone y pulsa «Confiar».</li>
+          <li>Prueba otro cable USB (muchos solo cargan) y un puerto USB directo del PC.</li>
+        </ol>
+      </details>
       <details id="toolsBox">
         <summary>Herramientas</summary>
         <ul id="tools"></ul>

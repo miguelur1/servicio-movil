@@ -6,7 +6,9 @@ para Android e iPhone/iPad, usando las herramientas oficiales y de código abier
 - **Android**: Android SDK Platform-Tools de Google (`adb`, `fastboot`).
 - **iPhone/iPad**: [libimobiledevice](https://libimobiledevice.org/) (la misma base que usan otras herramientas de taller).
 
-## Qué hace hoy (v0.2)
+## Qué hace hoy (v0.2.1)
+
+Compatible con cualquier Android con ADB (Samsung, Xiaomi, Motorola… y **Google Pixel**, con su driver USB oficial incluido e instalable desde la app) y con iPhone/iPad.
 
 | Función | Android | iPhone/iPad |
 |---|---|---|
