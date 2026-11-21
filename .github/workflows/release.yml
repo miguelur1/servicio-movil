@@ -3,7 +3,6 @@ name: build-and-release
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
 
 permissions:
@@ -29,13 +28,15 @@ jobs:
       - run: npm ci
       - run: npm run fetch-tools
         env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
-      # En una etiqueta vX.Y.Z se publica la Release; la app instalada se actualiza sola desde ella.
+      # Cada push a main publica la Release v<versión de package.json> (crea la etiqueta).
+      # Si esa versión ya está publicada, electron-builder no la sobrescribe: para sacar
+      # una actualización basta con subir "version" en package.json.
       - name: Publicar release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: npx electron-builder --win nsis --publish always
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
       - name: Compilar instalador (sin publicar)
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        if: github.event_name == 'pull_request'
         run: npx electron-builder --win nsis --publish never
       - uses: actions/upload-artifact@v4
         with:

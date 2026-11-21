@@ -42,10 +42,9 @@ En Android, el controlador USB del fabricante (p. ej. Samsung USB Driver) o el G
 
 ## Publicar una versión (auto-actualización)
 
-1. Sube la versión en `package.json` (p. ej. `0.2.0`).
-2. `git tag v0.2.0 && git push --tags`
-3. GitHub Actions compila el instalador `ServicioMovil-Setup-0.2.0.exe` en Windows y lo publica en Releases.
-4. Las copias instaladas lo detectan al abrir (y cada 4 h), lo descargan y ofrecen «Reiniciar y actualizar».
+1. Sube la versión en `package.json` (p. ej. `0.2.0`) y llévala a `main`.
+2. GitHub Actions compila el instalador `ServicioMovil-Setup-0.2.0.exe` en Windows y lo publica en Releases.
+3. Las copias instaladas lo detectan al abrir (y cada 4 h), lo descargan y ofrecen «Reiniciar y actualizar».
 
 Si el repositorio es **privado**, las copias instaladas no pueden leer sus Releases sin token;
 para el auto-update conviene un repo público solo de releases o un servidor propio (proveedor `generic`).

@@ -36,7 +36,9 @@ function get(url, { json = false, redirects = 5 } = {}) {
 function unzip(zip, dest) {
   fs.mkdirSync(dest, { recursive: true });
   if (process.platform === 'win32') {
-    execFileSync('powershell.exe', ['-NoProfile', '-Command', 'Expand-Archive', '-LiteralPath', zip, '-DestinationPath', dest, '-Force'], { stdio: 'inherit' });
+    // bsdtar viene con Windows 10/11 y abre .zip; evita los fallos de Expand-Archive entre PowerShell 5 y 7.
+    const tar = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+    execFileSync(tar, ['-xf', zip, '-C', dest], { stdio: 'inherit' });
   } else {
     execFileSync('unzip', ['-o', '-q', zip, '-d', dest], { stdio: 'inherit' });
   }
