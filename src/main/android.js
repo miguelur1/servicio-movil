@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const tools = require('./tools');
 const P = require('./parsers');
+const names = require('./devicenames');
 
 const REBOOT_MODES = new Set(['system', 'recovery', 'bootloader', 'sideload']);
 
@@ -14,7 +15,10 @@ async function listDevices() {
   ]);
   const devices = [];
   if (adb.status === 'fulfilled') {
-    for (const d of P.parseAdbDevices(adb.value.stdout)) devices.push({ platform: 'android', ...d });
+    for (const d of P.parseAdbDevices(adb.value.stdout)) {
+      const hit = d.model || d.device ? names.androidMarketName({ 'ro.product.model': d.model, 'ro.product.device': d.device }) : null;
+      devices.push({ platform: 'android', ...d, marketName: hit && hit.source === 'google' ? hit.name : null });
+    }
   }
   if (fb.status === 'fulfilled') {
     for (const d of P.parseFastbootDevices(fb.value.stdout)) devices.push({ platform: 'android', ...d, state: 'fastboot' });
@@ -33,6 +37,7 @@ async function getInfo(serial) {
   return {
     platform: 'android',
     serial,
+    marketName: names.androidMarketName(props).name,
     manufacturer: props['ro.product.manufacturer'] || null,
     brand: props['ro.product.brand'] || null,
     model: props['ro.product.model'] || null,

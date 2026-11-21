@@ -1,6 +1,9 @@
 #!/bin/sh
 echo "$@" >> "${FAKE_LOG:-/dev/null}"
 case "$*" in
+  *"shell for f in cycle_count"*)
+    if [ -n "$FAKE_NO_SYS" ]; then exit 0; fi
+    printf 'cycle_count=412\ncharge_full=3891000\ncharge_full_design=4614000\n' ;;
   "devices -l") printf 'List of devices attached\nR58M12ABCDE device usb:1-1 product:x model:SM_G973F device:beyond1 transport_id:3\n' ;;
   *"shell getprop") printf '[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-G973F]\n[ro.build.version.release]: [12]\n[ro.build.version.sdk]: [31]\n[ro.boot.flash.locked]: [1]\n' ;;
   *"shell dumpsys battery") printf '  level: 64\n  scale: 100\n  status: 3\n  health: 2\n  temperature: 305\n' ;;

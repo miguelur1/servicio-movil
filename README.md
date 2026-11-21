@@ -1,4 +1,6 @@
-# Servicio Móvil
+# MVR Servicio Móvil
+
+_Desarrollado por Miguel Velasco Rebollo._
 
 Aplicación de escritorio para Windows que reúne funciones **legítimas** de servicio técnico
 para Android e iPhone/iPad, usando las herramientas oficiales y de código abierto:
@@ -23,6 +25,7 @@ Compatible con cualquier Android con ADB (Samsung, Xiaomi, Motorola… y **Googl
 | Contactos → .vcf | ✓ | ✓ (desde la copia) |
 | Mensajes → .csv | ✓ SMS (si el sistema lo permite) | ✓ SMS e iMessage (desde la copia) |
 | Explorador de archivos | ✓ almacenamiento del teléfono | ✓ archivos de la copia (WhatsApp, notas, apps…) |
+| Salud de batería (ciclos, capacidad real vs. diseño) e informe para el cliente | ✓ (si el fabricante la expone) | ✓ |
 | Instalar APK, reiniciar a recovery/fastboot | ✓ | — |
 | Auto-actualización desde GitHub Releases | ✓ | ✓ |
 

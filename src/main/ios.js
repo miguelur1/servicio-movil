@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const tools = require('./tools');
 const P = require('./parsers');
+const names = require('./devicenames');
 
 async function listDevices() {
   try {
@@ -13,7 +14,7 @@ async function listDevices() {
       try {
         const { stdout: s } = await tools.run('ideviceinfo', ['-u', udid, '-s'], { timeout: 8000 });
         const i = P.parseIdeviceinfo(s);
-        return { platform: 'ios', serial: udid, state: 'device', model: i.DeviceName || i.ProductType || 'iPhone/iPad' };
+        return { platform: 'ios', serial: udid, state: 'device', model: i.DeviceName || i.ProductType || 'iPhone/iPad', marketName: names.iosMarketName(i.ProductType) };
       } catch (e) {
         // Sin emparejar: el usuario debe pulsar "Confiar" en el dispositivo.
         return { platform: 'ios', serial: udid, state: 'unpaired', model: 'Pulsa «Confiar» en el dispositivo', error: e.message };
@@ -46,6 +47,7 @@ async function getInfo(udid) {
     serial: udid,
     name: i.DeviceName || null,
     model: i.ProductType || null,
+    marketName: names.iosMarketName(i.ProductType),
     modelNumber: i.ModelNumber ? `${i.ModelNumber}${i.RegionInfo || ''}` : null,
     iosVersion: i.ProductVersion || null,
     buildId: i.BuildVersion || null,

@@ -32,7 +32,8 @@ async function refresh() {
   for (const d of devices) {
     const li = el('li', { class: selected && selected.serial === d.serial ? 'sel' : '', onclick: () => select(d) },
       el('div', {}, d.platform === 'ios' ? 'iPhone/iPad' : 'Android', el('span', { class: `badge ${d.state}` }, STATE[d.state] || d.state)),
-      el('div', {}, d.model || '—'),
+      el('div', {}, d.marketName || d.model || '—'),
+      d.marketName && d.model && d.marketName !== d.model ? el('div', { class: 'muted small' }, d.model) : null,
       el('div', { class: 'serial' }, d.serial));
     list.append(li);
   }
@@ -115,10 +116,12 @@ async function select(d) {
   if (!r.ok) { det.replaceChildren(el('p', { class: 'err' }, r.error)); return; }
   const i = r.data;
   const model = i.name || i.model || d.model || d.serial;
+  const title = i.platform === 'ios' ? (i.name && i.marketName ? `${i.name} · ${i.marketName}` : (i.marketName || model)) : (i.marketName || model);
   const ios = d.platform === 'ios';
 
   const tabs = [
     ['Información', () => infoTab(d, i, st)],
+    ['Diagnóstico', () => diagTab(d, st)],
     ['Copia de seguridad', () => backupTab(d, model, st)],
     ['Fotos', () => photosTab(d, model, st)],
     ['Contactos y mensajes', () => contactsTab(d, model, st)],
@@ -133,7 +136,7 @@ async function select(d) {
     body.replaceChildren(tabs[idx][1]());
   };
   tabs.forEach(([label], idx) => { const b = el('button', { class: 'tab' }, label); b.addEventListener('click', () => show(idx)); bar.append(b); });
-  det.replaceChildren(el('h3', {}, model), el('div', { class: 'serial muted' }, d.serial), bar, body, st.box);
+  det.replaceChildren(el('h3', {}, title), el('div', { class: 'serial muted' }, `${i.platform === 'ios' ? (i.model || '') : (i.model || '')} · ${d.serial}`), bar, body, st.box);
   show(0);
 }
 
@@ -142,10 +145,10 @@ function infoTab(d, i, st) {
   const usedBytes = s ? (s.usedBytes ?? (s.totalBytes - s.freeBytes)) : null;
   const used = s && s.totalBytes ? Math.round((usedBytes / s.totalBytes) * 100) : null;
   const cards = i.platform === 'ios' ? [
-    card('Nombre', i.name), card('Modelo', i.model), card('Nº de modelo', i.modelNumber), card('iOS', `${i.iosVersion || '—'} (${i.buildId || '—'})`),
+    card('Dispositivo', i.marketName), card('Nombre', i.name), card('Modelo', i.model), card('Nº de modelo', i.modelNumber), card('iOS', `${i.iosVersion || '—'} (${i.buildId || '—'})`),
     card('Nº de serie', i.serialNumber), card('Activación (lectura)', i.activationState), card('CPU', i.cpu),
   ] : [
-    card('Fabricante', i.manufacturer), card('Modelo', `${i.model || '—'} (${i.device || '—'})`), card('Android', `${i.androidVersion || '—'} · SDK ${i.sdk || '—'}`),
+    card('Dispositivo', i.marketName), card('Fabricante', i.manufacturer), card('Modelo', `${i.model || '—'} (${i.device || '—'})`), card('Android', `${i.androidVersion || '—'} · SDK ${i.sdk || '—'}`),
     card('Parche de seguridad', i.securityPatch), card('Build', i.buildId), card('Hardware / ABI', `${i.hardware || '—'} / ${i.abi || '—'}`),
     card('Bootloader', i.bootloaderLocked === null ? '—' : (i.bootloaderLocked ? 'Bloqueado' : 'Desbloqueado')), card('Verified boot', i.verifiedBoot),
   ];
@@ -170,6 +173,29 @@ function infoTab(d, i, st) {
   }
   const extra = d.platform === 'ios' ? note('En iOS 17 o posterior la captura de pantalla necesita el modo desarrollador activado en el iPhone.') : null;
   return el('div', {}, el('div', { class: 'grid' }, cards), actions, extra, out);
+}
+
+function diagTab(d, st) {
+  const box = el('div', { class: 'grid' }, el('p', { class: 'muted' }, 'Leyendo la batería…'));
+  const verdict = el('div', {});
+  window.api.battery(d.platform, d.serial).then((r) => {
+    if (!r.ok) { box.replaceChildren(el('p', { class: 'err' }, r.error)); return; }
+    const b = r.data;
+    const health = card('Salud de la batería', b.healthPercent != null ? `${b.healthPercent} %` : 'No disponible');
+    if (b.healthPercent != null) { const f = el('i'); f.style.width = `${Math.min(100, b.healthPercent)}%`; f.className = b.healthPercent >= 85 ? '' : b.healthPercent >= 80 ? 'warn' : 'bad'; health.append(el('div', { class: 'bar' }, f)); }
+    box.replaceChildren(health,
+      card('Ciclos de carga', b.cycleCount ?? 'No disponible'),
+      card('Capacidad de diseño', b.designCapacityMah ? `${b.designCapacityMah} mAh` : '—'),
+      card('Capacidad real a plena carga', b.fullChargeCapacityMah ? `${b.fullChargeCapacityMah} mAh` : '—'),
+      card('Carga / temperatura', `${b.currentCapacityPercent ?? '—'} % · ${b.temperatureC ?? '—'} °C`),
+      card('Voltaje', b.voltageMv ? `${b.voltageMv} mV` : '—'));
+    const v = b.healthPercent == null ? ['muted', d.platform === 'ios' ? 'El iPhone no ha informado de la capacidad.' : 'Este Android no expone la capacidad de la batería a ADB (depende del fabricante).']
+      : b.healthPercent >= 85 ? ['ok', 'Batería en buen estado.'] : b.healthPercent >= 80 ? ['warnt', 'Batería algo desgastada.'] : ['err', 'Batería degradada (por debajo del 80 %): se recomienda cambiarla.'];
+    verdict.replaceChildren(el('p', { class: v[0] }, v[1]));
+  });
+  return el('div', {}, box, verdict,
+    el('div', { class: 'actions' }, actionButton('Generar informe para el cliente', (btn) => st.run(btn, () => window.api.report(d.platform, d.serial), (f) => `Informe guardado en ${f} (se abre en el navegador; puedes imprimirlo o guardarlo como PDF).`))),
+    note('El informe incluye modelo, versión, nº de serie, almacenamiento y estado de la batería, con espacio para firmas.'));
 }
 
 function backupTab(d, model, st) {
@@ -286,9 +312,21 @@ function iosFilesTab(d, st) {
 async function loadTools() {
   const r = await window.api.toolsStatus();
   if (!r.ok) return;
-  $('#tools').replaceChildren(...r.data.map((t) => el('li', { class: t.ok ? 'ok' : 'err', title: t.error || t.path }, `${t.ok ? '✓' : '✗'} ${t.name}`)));
+  $('#tools').replaceChildren(...r.data.map((t) => {
+    const detail = el('div', { class: 'tooldetail', hidden: '' }, t.ok ? `${t.version || ''}` : t.error, el('br'), el('code', {}, t.path));
+    const head = el('div', { class: `toolhead ${t.ok ? 'ok' : 'err'}` }, `${t.ok ? '✓' : '✗'} ${t.name}`);
+    head.addEventListener('click', () => { detail.hidden = !detail.hidden; });
+    return el('li', {}, head, detail);
+  }));
   if (r.data.some((t) => !t.ok)) $('#toolsBox').open = true;
 }
+$('#restartAdb').addEventListener('click', async () => {
+  const b = $('#restartAdb'); const m = $('#adbMsg');
+  b.disabled = true; m.className = 'muted small'; m.textContent = ' Reiniciando…';
+  const r = await window.api.restartAdb();
+  b.disabled = false; m.className = r.ok ? 'ok small' : 'err small'; m.textContent = r.ok ? ' ADB reiniciado.' : ` ${r.error}`;
+  lastKey = ''; refresh(); loadTools();
+});
 
 window.api.onUpdate((s) => {
   const u = $('#update');

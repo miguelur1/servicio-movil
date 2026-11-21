@@ -1,0 +1,35 @@
+#!/bin/sh
+case "$*" in
+  *"--version"*) echo "idevicediagnostics 1.3.0" ;;
+  *"ioregentry AppleSmartBattery"*)
+    if [ -n "$FAKE_OLD_IOS" ]; then echo "ERROR: Unable to retrieve" >&2; exit 1; fi
+    cat <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IORegistry</key>
+	<dict>
+		<key>AppleRawMaxCapacity</key><integer>2685</integer>
+		<key>BatteryData</key>
+		<dict>
+			<key>DesignCapacity</key><integer>3227</integer>
+			<key>Serial</key><string>F5D1234&amp;X</string>
+		</dict>
+		<key>CurrentCapacity</key><integer>77</integer>
+		<key>CycleCount</key><integer>631</integer>
+		<key>DesignCapacity</key><integer>3227</integer>
+		<key>ExternalConnected</key><true/>
+		<key>IsCharging</key><false/>
+		<key>Temperature</key><integer>2950</integer>
+		<key>Voltage</key><integer>3921</integer>
+		<key>EmptyArray</key><array/>
+		<key>Ratio</key><real>0.5</real>
+	</dict>
+</dict>
+</plist>
+XML
+    ;;
+  *"diagnostics GasGauge"*)
+    printf '<?xml version="1.0"?><plist version="1.0"><dict><key>GasGauge</key><dict><key>CycleCount</key><integer>100</integer><key>DesignCapacity</key><integer>1810</integer><key>FullChargeCapacity</key><integer>1700</integer></dict></dict></plist>\n' ;;
+esac

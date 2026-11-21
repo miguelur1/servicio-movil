@@ -92,8 +92,9 @@ function shq(s) {
 
 async function available(name, args = ['version']) {
   try {
-    await run(name, args, { timeout: 8000 });
-    return { name, ok: true, path: resolveTool(name) };
+    const { stdout } = await run(name, args, { timeout: 8000 });
+    const version = String(stdout).split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 2).join(' · ');
+    return { name, ok: true, path: resolveTool(name), version };
   } catch (e) {
     return { name, ok: false, path: resolveTool(name), error: e.message };
   }

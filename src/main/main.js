@@ -10,6 +10,7 @@ const androidData = require('./android-data');
 const iosData = require('./ios-data');
 const fs = require('node:fs');
 const drivers = require('./drivers');
+const diagnostics = require('./diagnostics');
 
 log.initialize();
 let win;
@@ -20,7 +21,7 @@ function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'Servicio Móvil',
+    title: 'MVR Servicio Móvil',
     backgroundColor: '#0f1419',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -67,8 +68,19 @@ handle('tools:status', () => Promise.all([
   tools.available('adb', ['version']),
   tools.available('fastboot', ['--version']),
   tools.available('idevice_id', ['--version']),
+  tools.available('idevicebackup2', ['--version']),
+  tools.available('idevicediagnostics', ['--version']),
 ]));
 handle('app:version', () => app.getVersion());
+handle('diag:battery', (platform, serial) => (platform === 'ios' ? diagnostics.iosBattery(serial) : diagnostics.androidBattery(serial)));
+handle('diag:report', async (platform, serial) => {
+  const info = await mod(platform).getInfo(serial);
+  const battery = await (platform === 'ios' ? diagnostics.iosBattery(serial) : diagnostics.androidBattery(serial)).catch(() => null);
+  const file = diagnostics.saveReport(path.join(outDir(), 'Informes'), info, battery);
+  shell.openPath(file);
+  return file;
+});
+handle('tools:restartAdb', () => diagnostics.restartAdb());
 handle('drivers:google', () => drivers.installGoogleUsbDriver());
 handle('app:platform', () => process.platform);
 handle('update:check', () => updater.check());

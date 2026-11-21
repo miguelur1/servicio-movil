@@ -57,9 +57,10 @@ test('android.logcatDump limita el número de líneas', { skip }, async () => {
 
 test('ios.listDevices y getInfo', { skip }, async () => {
   const r = await ios.listDevices();
-  assert.deepEqual(r.devices, [{ platform: 'ios', serial: '00008110-001A2B3C4D5E801E', state: 'device', model: 'iPhone de prueba' }]);
+  assert.deepEqual(r.devices, [{ platform: 'ios', serial: '00008110-001A2B3C4D5E801E', state: 'device', model: 'iPhone de prueba', marketName: 'iPhone 13' }]);
   const i = await ios.getInfo('00008110-001A2B3C4D5E801E');
   assert.equal(i.iosVersion, '17.4.1');
+  assert.equal(i.marketName, 'iPhone 13');
   assert.equal(i.battery.level, 91);
   assert.equal(i.battery.status, 'Cargando');
   assert.deepEqual(i.storage, { totalBytes: 100000, freeBytes: 25000, usedBytes: 75000 });

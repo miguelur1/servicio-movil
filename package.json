@@ -1,10 +1,10 @@
 {
   "name": "servicio-movil",
-  "productName": "Servicio Móvil",
-  "version": "0.2.1",
+  "productName": "MVR Servicio Móvil",
+  "version": "0.3.0",
   "description": "Herramienta de servicio técnico para Android e iPhone en Windows (ADB, Fastboot, libimobiledevice).",
   "main": "src/main/main.js",
-  "author": "Miguel",
+  "author": "Miguel Velasco Rebollo",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
@@ -25,7 +25,7 @@
   },
   "build": {
     "appId": "com.miguelur1.serviciomovil",
-    "productName": "Servicio Móvil",
+    "productName": "MVR Servicio Móvil",
     "directories": {
       "output": "dist"
     },
@@ -46,13 +46,14 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "ServicioMovil-Setup-${version}.${ext}"
+      "artifactName": "MVR-ServicioMovil-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "shortcutName": "MVR Servicio Móvil"
     },
     "publish": [
       {
@@ -61,6 +62,7 @@
         "repo": "servicio-movil",
         "releaseType": "release"
       }
-    ]
+    ],
+    "copyright": "Desarrollado por Miguel Velasco Rebollo"
   }
 }

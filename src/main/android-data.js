@@ -136,7 +136,7 @@ async function backup(serial, dest, { apps = false } = {}, progress = () => {}) 
 
 async function restore(serial, src, progress = () => {}) {
   const mf = path.join(src, 'servicio-movil.json');
-  if (!fs.existsSync(mf)) throw new Error('Esa carpeta no es una copia de Servicio Móvil (falta servicio-movil.json).');
+  if (!fs.existsSync(mf)) throw new Error('Esa carpeta no es una copia de MVR Servicio Móvil (falta servicio-movil.json).');
   const manifest = JSON.parse(fs.readFileSync(mf, 'utf8'));
   const sd = path.join(src, 'sdcard');
   const folders = fs.existsSync(sd) ? fs.readdirSync(sd).filter((d) => fs.statSync(path.join(sd, d)).isDirectory()) : [];

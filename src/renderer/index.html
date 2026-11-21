@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
-  <title>Servicio Móvil</title>
+  <title>MVR Servicio Móvil</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header>
-    <h1>Servicio Móvil</h1>
+    <h1>MVR Servicio Móvil</h1>
     <div id="update" class="update" hidden></div>
     <span id="version" class="muted"></span>
   </header>
@@ -35,12 +35,15 @@
       <details id="toolsBox">
         <summary>Herramientas</summary>
         <ul id="tools"></ul>
+        <button id="restartAdb" class="ghost small-btn">Reiniciar ADB</button>
+        <span id="adbMsg" class="muted small"></span>
       </details>
     </aside>
     <section id="detail">
       <p class="muted">Selecciona un dispositivo.</p>
     </section>
   </main>
+  <footer>Desarrollado por Miguel Velasco Rebollo</footer>
   <script src="renderer.js"></script>
 </body>
 </html>

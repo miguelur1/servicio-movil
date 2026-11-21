@@ -76,6 +76,19 @@ async function googleUsbDriver() {
   console.log(`✓ Driver USB de Google (${name})`);
 }
 
+// Lista oficial de dispositivos de Google Play → nombres comerciales («Samsung Galaxy S24 Ultra»).
+async function deviceNames() {
+  const { buildDb } = require('../src/main/devicenames');
+  const raw = await get('https://storage.googleapis.com/play_public/supported_devices.csv');
+  const text = raw[0] === 0xff && raw[1] === 0xfe ? new TextDecoder('utf-16le').decode(raw) : raw.toString('utf8');
+  const db = buildDb(text);
+  const n = Object.keys(db.m).length;
+  if (n < 10000) throw new Error(`Lista de dispositivos sospechosamente corta (${n})`);
+  fs.mkdirSync(path.join(BIN, 'data'), { recursive: true });
+  fs.writeFileSync(path.join(BIN, 'data', 'android-models.json'), JSON.stringify(db));
+  console.log(`✓ Nombres comerciales: ${n} modelos`);
+}
+
 async function libimobiledevice() {
   const releases = await get(IMD_RELEASES, { json: true });
   let asset = null;
@@ -100,6 +113,7 @@ async function libimobiledevice() {
 (async () => {
   await platformTools();
   await googleUsbDriver();
+  await deviceNames();
   // En Windows con MSYS2 (runner de GitHub) se usa libimobiledevice actual vía
   // scripts/bundle-libimobiledevice.sh. Este build antiguo (1.2.1) queda solo como respaldo.
   if (process.argv.includes('--skip-ios')) return console.log(`✓ platform-tools listo en ${BIN}`);
