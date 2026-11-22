@@ -20,6 +20,11 @@ case "$*" in
   *"FactoryResetActivity"*) if [ -n "$FAKE_NO_RESET_ACT" ]; then echo "Error: Activity class {com.android.settings/com.android.settings.Settings\$FactoryResetActivity} does not exist."; else echo "Starting: Intent { cmp=com.android.settings/.Settings\$FactoryResetActivity }"; fi ;;
   *"ResetDashboardActivity"*) echo "Starting: Intent { cmp=com.android.settings/.Settings\$ResetDashboardActivity }" ;;
   *"am start -a android.settings.SYNC_SETTINGS"*) echo "Starting: Intent { act=android.settings.SYNC_SETTINGS }" ;;
+  *"shell ip -f inet addr show wlan0"*) if [ -n "$FAKE_NO_WIFI" ]; then printf '1: lo    inet 127.0.0.1/8 scope host lo\n'; else printf '30: wlan0    inet 192.168.1.40/24 brd 192.168.1.255 scope global wlan0\n'; fi ;;
+  *" tcpip 5555") echo "restarting in TCP mode port: 5555" ;;
+  "connect "*) case "$2" in 10.9.9.9:*) echo "failed to connect to $2: Connection refused" ;; *) echo "connected to $2" ;; esac ;;
+  "pair "*) if [ "$3" = "123456" ]; then echo "Successfully paired to $2 [guid=adb-XYZ]"; else echo "Failed: Wrong password or connection was dropped."; fi ;;
+  "disconnect "*) echo "disconnected $2" ;;
   "devices -l") printf 'List of devices attached\nR58M12ABCDE device usb:1-1 product:x model:SM_G973F device:beyond1 transport_id:3\n' ;;
   *"shell getprop") printf '[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-G973F]\n[ro.build.version.release]: [12]\n[ro.build.version.sdk]: [31]\n[ro.boot.flash.locked]: [1]\n' ;;
   *"shell dumpsys battery") printf '  level: 64\n  scale: 100\n  status: 3\n  health: 2\n  temperature: 305\n' ;;

@@ -109,3 +109,4 @@ details.section > summary { cursor:pointer; }
 /* Restablecer */
 .danger-box { border:1px solid #7f1d1d; background:#2a1215; color:#fecaca; border-radius:8px; padding:10px 14px; margin:8px 0 12px; display:grid; gap:4px; }
 button.dangerbtn { background:var(--err); } input.confirm { flex:0 0 160px; min-width:0; }
+.badge.wifi { background:#1e3a8a; color:#bfdbfe; }

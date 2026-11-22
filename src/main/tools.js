@@ -17,6 +17,7 @@ function binRoot() {
 const SUBDIR = {
   adb: 'platform-tools',
   fastboot: 'platform-tools',
+  scrcpy: 'scrcpy',
 };
 
 /** Ruta del ejecutable empaquetado o, si no existe, el nombre para buscarlo en PATH. */

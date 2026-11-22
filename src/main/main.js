@@ -17,6 +17,8 @@ const migration = require('./migrate');
 const deviceArt = require('./deviceart');
 const components = require('./components');
 const reset = require('./reset');
+const mirror = require('./mirror');
+const wireless = require('./wireless');
 const repair = require('./repair');
 const library = require('./library');
 const settings = require('./settings');
@@ -76,6 +78,7 @@ handle('device:logs', (platform, serial) => (platform === 'ios' ? ios.syslogDump
 handle('tools:status', () => Promise.all([
   tools.available('adb', ['version']),
   tools.available('fastboot', ['--version']),
+  tools.available('scrcpy', ['--version']),
   tools.available('idevice_id', ['--version']),
   tools.available('idevicebackup2', ['--version']),
   tools.available('idevicediagnostics', ['--version']),
@@ -86,6 +89,22 @@ handle('device:analyzeLogs', (platform, serial, text) => (platform === 'ios' ? i
 handle('diag:components', (platform, serial) => (platform === 'ios' ? components.iosComponents(serial) : components.androidComponents(serial)));
 handle('diag:test', (serial, test, on) => components.androidTest(serial, test, on));
 handle('diag:factoryMenu', (manufacturer) => components.factoryMenu(manufacturer));
+handle('wifi:enable', (serial) => wireless.enableTcpip(serial));
+handle('wifi:connect', (address) => wireless.connect(address));
+handle('wifi:pair', (address, code) => wireless.pair(address, code));
+handle('wifi:disconnect', (address) => wireless.disconnect(address));
+handle('mirror:start', (serial, opts = {}) => {
+  const record = opts.record ? path.join(outDir(), 'Grabaciones', `pantalla-${String(serial).replace(/[^\w.-]+/g, '_')}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.mp4`) : null;
+  return mirror.start(serial, { control: opts.control !== false, screenOff: !!opts.screenOff, record, wifi: wireless.isWifiSerial(serial), title: opts.title ? `MVR · ${String(opts.title).slice(0, 60)}` : null },
+    (e) => { if (win && !win.isDestroyed()) win.webContents.send('mirror:exit', e); }).then((state) => ({ state, record }));
+});
+handle('mirror:stop', (serial) => mirror.stop(serial));
+handle('mirror:status', (serial) => mirror.isRunning(serial));
+handle('mirror:openRecording', (file) => {
+  const f = path.resolve(String(file || ''));
+  if (path.dirname(f) !== path.resolve(path.join(outDir(), 'Grabaciones')) || !fs.existsSync(f)) throw new Error('Grabación no encontrada');
+  shell.showItemInFolder(f); return true;
+});
 handle('reset:check', (serial) => reset.androidCheck(serial));
 handle('reset:openScreen', (serial) => reset.androidOpenResetScreen(serial));
 handle('reset:openAccounts', (serial) => reset.androidOpenAccounts(serial));

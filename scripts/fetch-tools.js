@@ -89,6 +89,33 @@ async function deviceNames() {
   console.log(`✓ Nombres comerciales: ${n} modelos`);
 }
 
+// scrcpy (espejo y control de pantalla Android por USB). Se usa el adb de platform-tools, no el suyo.
+const SCRCPY_RELEASES = 'https://api.github.com/repos/Genymobile/scrcpy/releases?per_page=10';
+async function scrcpy() {
+  const releases = await get(SCRCPY_RELEASES, { json: true });
+  let asset = null; let tag = null;
+  for (const r of releases) {
+    if (r.prerelease || r.draft) continue;
+    asset = (r.assets || []).find((a) => /^scrcpy-win64-v[\d.]+\.zip$/i.test(a.name));
+    if (asset) { tag = r.tag_name; break; }
+  }
+  if (!asset) throw new Error('No se encontró scrcpy para Windows x64');
+  console.log(`scrcpy: ${tag} (${asset.name})`);
+  const zip = await download(asset.browser_download_url, 'scrcpy.zip');
+  const dest = path.join(BIN, 'scrcpy');
+  fs.rmSync(dest, { recursive: true, force: true });
+  unzip(zip, dest);
+  if (!fs.existsSync(path.join(dest, 'scrcpy.exe'))) {
+    const sub = fs.readdirSync(dest).map((d) => path.join(dest, d)).find((d) => fs.existsSync(path.join(d, 'scrcpy.exe')));
+    if (!sub) throw new Error('scrcpy.exe no está en el zip');
+    for (const f of fs.readdirSync(sub)) fs.renameSync(path.join(sub, f), path.join(dest, f));
+    fs.rmSync(sub, { recursive: true, force: true });
+  }
+  // Su propio adb chocaría con el servidor adb de platform-tools (versiones distintas).
+  for (const f of fs.readdirSync(dest)) if (/^(adb\.exe|AdbWinApi\.dll|AdbWinUsbApi\.dll)$/i.test(f)) fs.rmSync(path.join(dest, f));
+  fs.writeFileSync(path.join(dest, 'VERSION.txt'), `${tag}\n`);
+}
+
 async function libimobiledevice() {
   const releases = await get(IMD_RELEASES, { json: true });
   let asset = null;
@@ -114,6 +141,7 @@ async function libimobiledevice() {
   await platformTools();
   await googleUsbDriver();
   await deviceNames();
+  await scrcpy();
   // En Windows con MSYS2 (runner de GitHub) se usa libimobiledevice actual vía
   // scripts/bundle-libimobiledevice.sh. Este build antiguo (1.2.1) queda solo como respaldo.
   if (process.argv.includes('--skip-ios')) return console.log(`✓ platform-tools listo en ${BIN}`);

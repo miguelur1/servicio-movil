@@ -14,6 +14,7 @@ const fmtBytes = (n) => {
   while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
   return `${v.toFixed(i ? 1 : 0)} ${u[i]}`;
 };
+const isWifi = (serial) => /^\d{1,3}(\.\d{1,3}){3}:\d+$/.test(serial) || /_adb-tls-connect\._tcp/.test(serial);
 const STATE = { device: 'Conectado', unauthorized: 'Autoriza en el teléfono', offline: 'Sin conexión', fastboot: 'Fastboot', recovery: 'Recovery', sideload: 'Sideload', unpaired: 'Sin emparejar' };
 
 let selected = null; // {platform, serial, state}
@@ -33,7 +34,7 @@ async function refresh() {
   if (!devices.length) $('#helpBox').open = true;
   for (const d of devices) {
     const li = el('li', { class: selected && selected.serial === d.serial ? 'sel' : '', onclick: () => select(d) },
-      el('div', {}, d.platform === 'ios' ? 'iPhone/iPad' : 'Android', el('span', { class: `badge ${d.state}` }, STATE[d.state] || d.state)),
+      el('div', {}, d.platform === 'ios' ? 'iPhone/iPad' : 'Android', el('span', { class: `badge ${d.state}` }, STATE[d.state] || d.state), isWifi(d.serial) ? el('span', { class: 'badge wifi' }, 'Wi-Fi') : null),
       el('div', {}, d.marketName || d.model || '—'),
       d.marketName && d.model && d.marketName !== d.model ? el('div', { class: 'muted small' }, d.model) : null,
       el('div', { class: 'serial' }, d.serial));
@@ -151,7 +152,8 @@ async function select(d) {
   }
   if (d.state !== 'device') {
     det.replaceChildren(el('h3', {}, STATE[d.state] || d.state), el('p', { class: 'muted' },
-      d.platform === 'ios' ? 'Desbloquea el iPhone y pulsa «Confiar en este ordenador».' : 'Acepta la huella RSA de depuración USB en la pantalla del teléfono.'));
+      d.platform === 'ios' ? 'Desbloquea el iPhone y pulsa «Confiar en este ordenador».' : 'Acepta la huella RSA de depuración USB en la pantalla del teléfono.'),
+      d.platform === 'android' && d.state === 'unauthorized' ? brokenScreenHelp(false) : null);
     return;
   }
 
@@ -171,6 +173,7 @@ async function select(d) {
     ['Contactos y mensajes', () => contactsTab(d, model, st)],
     [ios ? 'Archivos de la copia' : 'Archivos', () => (ios ? iosFilesTab(d, st) : filesTab(d, st))],
     ['Reparación', () => repairTab(d, i.marketName || i.model || d.model || d.serial, st)],
+    ['Pantalla en el PC', () => mirrorTab(d, i, st)],
     ['Restablecer', () => resetTab(d, st)],
   ];
   const body = el('div', { class: 'tabbody' });
@@ -370,6 +373,75 @@ function repairTab(d, name, st) {
   window.api.settingsGet().then((r) => { if (r.ok) sitesInput.value = r.data.schematicSites.join('\n'); });
   loadLinks(); loadLib();
   return wrap;
+}
+
+// ── Pantalla en el PC (espejo y control) ─────────────────────────────────────
+let mirrorMsg = null;
+window.api.onMirrorExit((e) => {
+  if (!mirrorMsg || !mirrorMsg.isConnected) return;
+  mirrorMsg.className = 'muted';
+  mirrorMsg.textContent = e.record ? 'Espejo cerrado. La grabación se ha guardado.' : 'Espejo cerrado.';
+  if (e.record) mirrorMsg.append(' ', el('button', { class: 'linkbtn', onclick: () => window.api.mirrorOpenRecording(e.record) }, 'Mostrar el vídeo'));
+});
+
+function brokenScreenHelp(authorized) {
+  return section('Si la pantalla está rota o no se ve',
+    el('ul', { class: 'help' },
+      authorized ? el('li', {}, el('b', {}, 'Este PC ya está autorizado: '), 'puedes ver y manejar el móvil desde aquí aunque la pantalla no funcione.') : null,
+      el('li', {}, el('b', {}, 'Depuración USB sin autorizar: '), 'el aviso «¿Permitir depuración USB?» sale en la pantalla del móvil y hay que aceptarlo allí. Si el táctil funciona aunque no se vea, o con un ratón USB (adaptador OTG), se puede pulsar «Permitir».'),
+      el('li', {}, el('b', {}, 'Sin depuración USB activada: '), 'no hay forma de manejarlo por cable. Opciones: conectar una pantalla de pruebas temporalmente (lo más fiable en taller), o una salida de vídeo USB-C a HDMI en los modelos que la tienen (Samsung DeX, Pixel 8 o posteriores) con ratón OTG.'),
+      el('li', {}, el('b', {}, 'Con el móvil bloqueado: '), 'el cliente te da su PIN o patrón y lo introduces con el ratón o el teclado. La app no quita ni salta bloqueos.')));
+}
+
+function mirrorTab(d, i, st) {
+  if (d.platform === 'ios') {
+    return el('div', {},
+      section('Ver la pantalla del iPhone desde el PC',
+        el('p', {}, 'Apple no permite ver ni manejar la pantalla de un iPhone por cable desde Windows. AirPlay o QuickTime necesitan aceptar en el propio iPhone, así que con la pantalla rota no es una vía práctica.'),
+        el('h5', {}, 'Cómo recuperar los datos de un iPhone con la pantalla rota'),
+        el('ul', { class: 'help' },
+          el('li', {}, el('b', {}, 'Si ya confía en este PC (aparece como Conectado): '), 'haz la copia en «Copia de seguridad» y saca fotos, contactos, mensajes y archivos en sus pestañas. No hace falta tocar la pantalla.'),
+          el('li', {}, el('b', {}, 'Si no confía en este PC: '), 'el aviso «¿Confiar en este ordenador?» y el código se introducen en el iPhone. La vía más fiable en taller es conectar una pantalla de pruebas temporalmente.'),
+          el('li', {}, el('b', {}, 'iCloud: '), 'si el cliente tenía copia en iCloud, puede recuperar todo en otro iPhone con su Apple ID.')),
+        note('La app no salta el código ni el bloqueo de activación.')));
+  }
+  const msg = el('p', { class: 'muted' });
+  mirrorMsg = msg;
+  const ctl = el('input', { type: 'checkbox', checked: '' });
+  const off = el('input', { type: 'checkbox' });
+  const rec = el('input', { type: 'checkbox' });
+  const opts = () => ({ control: ctl.checked, screenOff: off.checked, record: rec.checked, title: i.marketName || i.model });
+  const startBtn = actionButton('Abrir la pantalla del móvil en el PC', (b) => st.run(b, () => window.api.mirrorStart(d.serial, opts()), (x) => {
+    msg.className = 'ok'; msg.textContent = x.state === 'running' ? 'El espejo ya estaba abierto.' : 'Pantalla abierta en una ventana aparte.';
+    return x.record ? 'Grabando la sesión en vídeo.' : 'Espejo abierto.';
+  }));
+  const stopBtn = actionButton('Cerrar el espejo', (b) => st.run(b, () => window.api.mirrorStop(d.serial), (x) => (x ? 'Espejo cerrado.' : 'No había ningún espejo abierto.')), true);
+  return el('div', {},
+    section('Ver y manejar el móvil desde el PC',
+      note('Se abre una ventana con la pantalla del móvil en directo. Con el ratón tocas y deslizas, y con el teclado escribes. Sirve para recuperar datos de un móvil con la pantalla rota.'),
+      el('label', { class: 'check' }, ctl, 'Manejar el móvil con ratón y teclado (si lo quitas, solo se ve)'),
+      el('label', { class: 'check' }, off, 'Apagar la pantalla del móvil mientras tanto (ahorra batería; la imagen sigue en el PC)'),
+      el('label', { class: 'check' }, rec, 'Grabar la sesión en vídeo (Documentos › Servicio Movil › Grabaciones)'),
+      el('div', { class: 'actions' }, startBtn, stopBtn), msg,
+      el('h5', {}, 'Atajos en la ventana del espejo'),
+      el('ul', { class: 'help' },
+        el('li', {}, el('b', {}, 'Clic derecho: '), 'Atrás. ', el('b', {}, 'Clic central: '), 'Inicio.'),
+        el('li', {}, el('b', {}, 'Ctrl+V: '), 'pega en el móvil el texto copiado en el PC.'),
+        el('li', {}, el('b', {}, 'Arrastrar un archivo a la ventana: '), 'un APK se instala; cualquier otro archivo se copia a la carpeta Download del móvil.'),
+        el('li', {}, 'Para sacar fotos y archivos usa las pestañas «Fotos», «Archivos» y «Copia de seguridad» mientras tienes el espejo abierto.'))),
+    wifiSection(d, st),
+    brokenScreenHelp(true));
+}
+
+function wifiSection(d, st) {
+  if (isWifi(d.serial)) {
+    return section('Conectado por Wi-Fi',
+      note(`El móvil está conectado sin cable (${d.serial}). Si va lento, acerca el móvil al router o vuelve al cable.`),
+      el('div', { class: 'actions' }, actionButton('Desconectar Wi-Fi', (b) => st.run(b, () => window.api.wifiDisconnect(d.serial), () => { lastKey = ''; refresh(); return 'Desconectado.'; }), true)));
+  }
+  return section('Usarlo sin cable (Wi-Fi)',
+    note('Pasa este móvil a Wi-Fi: después puedes quitar el cable y seguir viendo la pantalla y usando todas las pestañas. El móvil y el PC deben estar en la misma Wi-Fi.'),
+    el('div', { class: 'actions' }, actionButton('Pasar a Wi-Fi', (b) => st.run(b, () => window.api.wifiEnable(d.serial), (x) => { lastKey = ''; refresh(); return `Listo: aparece en la lista como ${x.address}. Ya puedes quitar el cable.`; }), true)));
 }
 
 // ── Restablecer de fábrica ────────────────────────────────────────────────────
@@ -803,6 +875,35 @@ function migrateView() {
     st.box);
 }
 $('#openMigrate').addEventListener('click', migrateView);
+$('#openWifi').addEventListener('click', wifiView);
+
+function wifiView() {
+  selected = null; lastKey = ''; refresh();
+  const st = statusBox();
+  const ip = el('input', { type: 'text', class: 'search', placeholder: 'IP del móvil, p. ej. 192.168.1.40 o 192.168.1.40:5555' });
+  const pAddr = el('input', { type: 'text', class: 'search', placeholder: 'IP:puerto de emparejamiento, p. ej. 192.168.1.40:41234' });
+  const pCode = el('input', { type: 'text', class: 'search confirm', placeholder: 'Código (6 cifras)', inputmode: 'numeric' });
+  const cAddr = el('input', { type: 'text', class: 'search', placeholder: 'IP:puerto de conexión (la que sale en «Depuración inalámbrica»)' });
+  $('#detail').replaceChildren(el('h3', {}, 'Conectar un Android por Wi-Fi'),
+    note('El móvil y este PC tienen que estar en la misma red Wi-Fi. Una vez conectado aparece en la lista con la etiqueta «Wi-Fi» y funcionan todas las pestañas, también ver y manejar la pantalla.'),
+    section('Opción 1 · Desde un móvil conectado por USB (cualquier Android)',
+      note('Conecta el móvil por USB, entra en él y en la pestaña «Pantalla en el PC» pulsa «Pasar a Wi-Fi». Después ya puedes quitar el cable. Si el móvil se reinicia, hay que repetirlo.')),
+    section('Opción 2 · Volver a conectar un móvil que ya pasaste a Wi-Fi',
+      el('div', { class: 'actions' }, ip, actionButton('Conectar', (b) => st.run(b, () => window.api.wifiConnect(ip.value), (x) => { lastKey = ''; refresh(); return `Conectado a ${x.address}.`; })))),
+    section('Opción 3 · Sin cable, Android 11 o posterior (Depuración inalámbrica)',
+      el('ol', { class: 'help' },
+        el('li', {}, 'En el móvil: Opciones de desarrollador › Depuración inalámbrica › «Vincular dispositivo con código de vinculación».'),
+        el('li', {}, 'Escribe aquí la IP:puerto y el código que aparecen en esa ventana y pulsa «Emparejar».'),
+        el('li', {}, 'Después escribe la IP:puerto que aparece en la pantalla principal de «Depuración inalámbrica» y pulsa «Conectar».')),
+      el('div', { class: 'actions' }, pAddr, pCode, actionButton('Emparejar', (b) => st.run(b, () => window.api.wifiPair(pAddr.value, pCode.value), () => 'Emparejado. Ahora conecta con la IP:puerto de la pantalla principal.'))),
+      el('div', { class: 'actions' }, cAddr, actionButton('Conectar', (b) => st.run(b, () => window.api.wifiConnect(cAddr.value), (x) => { lastKey = ''; refresh(); return `Conectado a ${x.address}.`; }), true)),
+      note('Esta opción necesita ver y tocar la pantalla del móvil para activarla. Con la pantalla rota usa la opción 1 si el PC ya estaba autorizado.')),
+    section('¿Y por Bluetooth o con iPhone?',
+      el('ul', { class: 'help' },
+        el('li', {}, el('b', {}, 'Bluetooth: '), 'no sirve para esto. Es demasiado lento para ver la pantalla o copiar datos, y ni Android ni iPhone permiten manejarlos así desde un PC.'),
+        el('li', {}, el('b', {}, 'iPhone por Wi-Fi: '), 'Apple solo lo permite si antes se conectó por cable, el iPhone confió en este PC y se activó «Sincronizar por Wi-Fi» en Dispositivos Apple o iTunes. Ver la pantalla por Wi-Fi (AirPlay) hay que aceptarlo en el propio iPhone. Por ahora la app trabaja con el iPhone por cable.'))),
+    st.box);
+}
 
 async function loadTools() {
   const r = await window.api.toolsStatus();

@@ -1,0 +1,4 @@
+#!/bin/sh
+echo "scrcpy ADB=$ADB $@" >> "${FAKE_LOG:-/dev/null}"
+if [ -n "$FAKE_SCRCPY_FAIL" ]; then echo "ERROR: Device is unauthorized" >&2; exit 1; fi
+sleep 4

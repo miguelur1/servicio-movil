@@ -33,6 +33,8 @@ Compatible con cualquier Android con ADB (Samsung, Xiaomi, Motorola… y **Googl
 | Imagen del dispositivo: silueta por modelo, pantalla en directo y foto propia | ✓ | ✓ (pantalla en directo: iOS 17+ requiere modo desarrollador) |
 | Reparación: lista de reparaciones (recomendadas por el diagnóstico) y guía paso a paso con fotos (iFixit, CC BY-NC-SA, en español si hay traducción); manuales oficiales, búsqueda de esquemas en tus sitios y biblioteca propia por modelo | ✓ | ✓ |
 | Informe para el cliente en PDF (dispositivo, batería, piezas, análisis del registro) y compartir: WhatsApp, correo, copiar, guardar o pasar al móvil | ✓ | ✓ (pasar al móvil: solo Android) |
+| Ver y manejar la pantalla del móvil desde el PC (pantalla rota), con grabación en vídeo | ✓ scrcpy por USB o Wi-Fi (necesita depuración USB ya autorizada) | — Apple no lo permite por cable; recuperación vía copia de seguridad |
+| Conexión por Wi-Fi | ✓ pasar de USB a Wi-Fi, reconectar por IP o emparejar (Android 11+) | — por ahora solo cable |
 | Restablecer de fábrica (hard reset) por los caminos oficiales, con aviso de copia y de la cuenta Google / Apple ID | ✓ Ajustes del teléfono, recovery o fastboot -w (solo con bootloader ya desbloqueado) | ✓ desde el iPhone o modo recuperación + restaurar con Dispositivos Apple / iTunes |
 | Instalar APK, reiniciar a recovery/fastboot | ✓ | — |
 | Auto-actualización desde GitHub Releases | ✓ | ✓ |

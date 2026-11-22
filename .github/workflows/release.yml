@@ -27,6 +27,7 @@ jobs:
         with: { node-version: 22 }
       - run: npm ci
       - run: node scripts/fetch-tools.js --skip-ios
+        env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
       - name: Empaquetar libimobiledevice (MSYS2, compatible con iOS recientes)
         shell: C:\msys64\usr\bin\bash.exe -leo pipefail {0}
         env: { CHERE_INVOKING: '1', MSYSTEM: UCRT64 }
@@ -35,6 +36,7 @@ jobs:
         shell: bash
         run: |
           resources/bin/platform-tools/adb.exe version
+          resources/bin/scrcpy/scrcpy.exe --version
           test -f resources/bin/google-usb-driver/android_winusb.inf && grep -c "18D1" resources/bin/google-usb-driver/android_winusb.inf
           resources/bin/libimobiledevice/idevice_id.exe --version
           resources/bin/libimobiledevice/idevicebackup2.exe --version
