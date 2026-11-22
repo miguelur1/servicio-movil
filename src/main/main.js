@@ -1,5 +1,6 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { execFile } = require('node:child_process');
 const path = require('node:path');
 const log = require('electron-log/main');
 const android = require('./android');
@@ -116,25 +117,30 @@ handle('report:saveAs', async (f) => {
   fs.copyFileSync(src, r.filePath);
   return r.filePath;
 });
-/** Copia el PDF como archivo al portapapeles: se pega con Ctrl+V en WhatsApp, correo o una carpeta. */
-function copyFileToClipboard(file) {
+/** Copia el PDF como archivo al portapapeles de Windows (Set-Clipboard): se pega con Ctrl+V en WhatsApp, correo o una carpeta. */
+async function copyFileToClipboard(file) {
   if (process.platform !== 'win32') throw new Error('Solo disponible en Windows');
-  clipboard.writeBuffer('FileNameW', Buffer.from(`${file}\0`, 'ucs2'));
+  const lit = file.replace(/'/g, "''");
+  await new Promise((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Set-Clipboard -LiteralPath '${lit}'`],
+    { windowsHide: true, timeout: 15000 }, (err) => (err ? reject(new Error('No se pudo copiar el PDF al portapapeles')) : resolve())));
   return true;
+}
+/** Copia el PDF; si Windows no lo permite, abre la carpeta con el PDF marcado para arrastrarlo. */
+async function copyOrShow(file) {
+  try { await copyFileToClipboard(file); return 'copied'; } catch (e) { log.warn(e); shell.showItemInFolder(file); return 'folder'; }
 }
 handle('report:copy', (f) => copyFileToClipboard(reportFile(f)));
 handle('report:whatsapp', async (f) => {
-  copyFileToClipboard(reportFile(f));
+  const how = await copyOrShow(reportFile(f));
   await shell.openExternal('whatsapp://').catch(() => shell.openExternal('https://web.whatsapp.com/'));
-  return true;
+  return how;
 });
 handle('report:email', async (f, device) => {
-  const file = reportFile(f);
-  copyFileToClipboard(file);
+  const how = await copyOrShow(reportFile(f));
   const subject = encodeURIComponent(`Informe de diagnóstico · ${device || ''}`.trim());
   const body = encodeURIComponent('Hola,\n\nTe adjunto el informe de diagnóstico de tu dispositivo.\n\nUn saludo.');
   await shell.openExternal(`mailto:?subject=${subject}&body=${body}`);
-  return true;
+  return how;
 });
 handle('report:toPhone', async (f, platform, serial) => {
   const file = reportFile(f);

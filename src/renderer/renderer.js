@@ -487,8 +487,8 @@ function reportSection(d, st) {
     put(share, el('p', { class: 'ok small' }, `📄 ${r.data.name}`), el('div', { class: 'actions' },
       go('Abrir', () => window.api.reportOpen(file), () => 'Abierto.', false),
       go('Guardar como…', () => window.api.reportSaveAs(file), (x) => `Guardado en ${x}`),
-      go('Enviar por WhatsApp', () => window.api.reportWhatsapp(file), () => 'PDF copiado. En WhatsApp, abre el chat del cliente y pulsa Ctrl+V para adjuntarlo.'),
-      go('Enviar por correo', () => window.api.reportEmail(file, device), () => 'Correo abierto y PDF copiado: pulsa Ctrl+V en el mensaje para adjuntarlo.'),
+      go('Enviar por WhatsApp', () => window.api.reportWhatsapp(file), (how) => (how === 'copied' ? 'PDF copiado. En WhatsApp, abre el chat del cliente y pulsa Ctrl+V para adjuntarlo.' : 'He abierto la carpeta con el PDF: arrástralo al chat de WhatsApp.')),
+      go('Enviar por correo', () => window.api.reportEmail(file, device), (how) => (how === 'copied' ? 'Correo abierto y PDF copiado: pulsa Ctrl+V en el mensaje para adjuntarlo.' : 'Correo abierto. He abierto la carpeta con el PDF: arrástralo al mensaje.')),
       go('Copiar PDF', () => window.api.reportCopy(file), () => 'PDF copiado: pégalo (Ctrl+V) donde quieras compartirlo.'),
       d.platform === 'android' ? go('Pasar al móvil del cliente', () => window.api.reportToPhone(file, d.platform, d.serial), (x) => `Copiado al teléfono en ${x} (carpeta Descargas).`) : null,
       go('Mostrar en la carpeta', () => window.api.reportShow(file), () => 'Carpeta abierta.')));
