@@ -146,7 +146,7 @@ async function select(d) {
     for (const [m, l] of [['system', 'Reiniciar'], ['bootloader', 'Reiniciar a bootloader'], ['recovery', 'Reiniciar a recovery']]) {
       actions.append(actionButton(l, (b) => st.run(b, () => window.api.reboot(d.serial, m, true), () => 'Orden enviada.'), m !== 'system'));
     }
-    det.replaceChildren(el('h3', {}, 'Dispositivo en modo Fastboot'), el('div', { class: 'serial muted' }, d.serial), actions, st.box);
+    det.replaceChildren(el('h3', {}, 'Dispositivo en modo Fastboot'), el('div', { class: 'serial muted' }, d.serial), actions, fastbootWipeSection(d, st), st.box);
     return;
   }
   if (d.state !== 'device') {
@@ -171,6 +171,7 @@ async function select(d) {
     ['Contactos y mensajes', () => contactsTab(d, model, st)],
     [ios ? 'Archivos de la copia' : 'Archivos', () => (ios ? iosFilesTab(d, st) : filesTab(d, st))],
     ['Reparación', () => repairTab(d, i.marketName || i.model || d.model || d.serial, st)],
+    ['Restablecer', () => resetTab(d, st)],
   ];
   const body = el('div', { class: 'tabbody' });
   const bar = el('div', { class: 'tabs' });
@@ -369,6 +370,70 @@ function repairTab(d, name, st) {
   window.api.settingsGet().then((r) => { if (r.ok) sitesInput.value = r.data.schematicSites.join('\n'); });
   loadLinks(); loadLib();
   return wrap;
+}
+
+// ── Restablecer de fábrica ────────────────────────────────────────────────────
+/** Botón que solo se activa al escribir BORRAR. */
+function confirmButton(label, onRun) {
+  const input = el('input', { type: 'text', class: 'search confirm', placeholder: 'Escribe BORRAR' });
+  const btn = actionButton(label, (b) => onRun(b, input.value));
+  btn.classList.add('dangerbtn'); btn.disabled = true;
+  input.addEventListener('input', () => { btn.disabled = input.value.trim().toUpperCase() !== 'BORRAR'; });
+  return el('div', { class: 'actions' }, input, btn);
+}
+const resetWarn = () => el('div', { class: 'danger-box' }, el('b', {}, 'Esto borra todo el teléfono: fotos, mensajes, apps y cuentas. No se puede deshacer.'),
+  el('div', { class: 'small' }, 'Haz antes la copia en la pestaña «Copia de seguridad» y comprueba que el cliente conoce su cuenta y su contraseña.'));
+
+function resetTab(d, st) {
+  if (d.platform === 'ios') {
+    return el('div', {}, resetWarn(),
+      section('1 · Bloqueo de activación (Buscar mi iPhone)',
+        note('Si «Buscar» está activado, después de restaurar el iPhone pedirá el Apple ID y la contraseña del cliente. Desactívalo antes en Ajustes › [nombre del cliente] › Buscar › Buscar mi iPhone, o asegúrate de que el cliente tiene su Apple ID a mano.')),
+      section('2 · Opción recomendada: desde el propio iPhone',
+        el('ol', { class: 'help' }, el('li', {}, 'Ajustes › General › Transferir o restablecer el iPhone.'), el('li', {}, 'Pulsa «Borrar contenidos y ajustes» y confirma con el código del iPhone.')),
+        note('Es la forma más rápida y no necesita descargar iOS.')),
+      section('3 · Restaurar con el ordenador (si el iPhone no arranca o no responde)',
+        el('ol', { class: 'help' },
+          el('li', {}, 'Pon el iPhone en modo recuperación con el botón de abajo.'),
+          el('li', {}, 'Abre Dispositivos Apple (o iTunes) en este PC: aparecerá el aviso de un iPhone en modo recuperación.'),
+          el('li', {}, 'Pulsa «Restaurar». Descarga el iOS oficial de Apple y deja el iPhone como nuevo.')),
+        confirmButton('Poner en modo recuperación', (b, v) => st.run(b, () => window.api.resetIosRecovery(d.serial, v), () => 'El iPhone se ha reiniciado en modo recuperación. Ahora restaura desde Dispositivos Apple o iTunes.')),
+        el('div', { class: 'actions' }, link('Guía oficial de Apple', 'https://support.apple.com/es-es/HT201252', 'act ghost'), link('Descargar Dispositivos Apple', 'https://apps.microsoft.com/search?query=Apple%20Devices', 'act ghost'))));
+  }
+  const acc = el('div', {}, note('Comprobando cuentas…'));
+  window.api.resetCheck(d.serial).then((r) => {
+    if (!r.ok) { put(acc, el('p', { class: 'err' }, r.error)); return; }
+    const g = r.data.googleAccounts;
+    put(acc, g.length
+      ? el('div', {}, el('p', { class: 'warnt' }, `Cuenta de Google en el teléfono: ${g.join(', ')}.`),
+        note('Si se borra desde recovery o fastboot con la cuenta puesta, al arrancar pedirá esa cuenta (protección FRP). Quítala antes en Ajustes › Cuentas con la contraseña del cliente, o restablece desde Ajustes, o asegúrate de que el cliente la conoce.'),
+        el('div', { class: 'actions' }, actionButton('Abrir Cuentas en el teléfono', (b) => st.run(b, () => window.api.resetOpenAccounts(d.serial), () => 'Ajustes › Cuentas abierto en el teléfono.'), true)))
+      : el('p', { class: 'ok' }, 'No hay cuentas de Google: tras el borrado no pedirá cuenta.'),
+    r.data.bootloaderUnlocked ? note('El bootloader está desbloqueado: también puedes borrar desde el modo fastboot.') : null);
+  });
+  return el('div', {}, resetWarn(),
+    section('1 · Cuenta de Google (protección FRP)', acc),
+    section('2 · Opción recomendada: desde Ajustes del teléfono',
+      note('Abre en el teléfono la pantalla oficial «Borrar todos los datos». El cliente (o tú con su código) confirma allí.'),
+      el('div', { class: 'actions' }, actionButton('Abrir «Borrar todos los datos» en el teléfono', (b) => st.run(b, () => window.api.resetOpenScreen(d.serial), (x) => (x === 'settings' ? 'Ajustes abierto: ve a Sistema › Opciones de recuperación › Borrar todos los datos.' : 'Pantalla de restablecimiento abierta en el teléfono.'))))),
+    section('3 · Desde recovery (si el teléfono no arranca bien o no se puede usar)',
+      el('ol', { class: 'help' },
+        el('li', {}, 'Pulsa «Reiniciar a recovery».'),
+        el('li', {}, 'En el teléfono, muévete con los botones de volumen hasta «Wipe data / factory reset» y confirma con el botón de encendido.'),
+        el('li', {}, 'Al terminar elige «Reboot system now».')),
+      el('div', { class: 'actions' }, actionButton('Reiniciar a recovery', (b) => st.run(b, () => window.api.resetRecovery(d.serial), () => 'El teléfono se está reiniciando a recovery.'), true)),
+      note('Si se queda en «No command», mantén encendido y pulsa una vez volumen arriba para ver el menú.')));
+}
+
+function fastbootWipeSection(d, st) {
+  const box = el('div', {}, note('Comprobando el bootloader…'));
+  window.api.resetFastbootState(d.serial).then((r) => {
+    const unlocked = r.ok && r.data === true;
+    put(box, unlocked
+      ? el('div', {}, resetWarn(), confirmButton('Borrar datos (fastboot -w)', (b, v) => st.run(b, () => window.api.resetFastbootWipe(d.serial, v), () => 'Datos borrados. El teléfono se está reiniciando.')))
+      : note(r.ok && r.data === false ? 'Bootloader bloqueado: el borrado por fastboot no está permitido. Usa recovery o Ajustes del teléfono.' : 'No se pudo leer el estado del bootloader.'));
+  });
+  return section('Restablecer de fábrica', box);
 }
 
 function infoTab(d, i, st) {

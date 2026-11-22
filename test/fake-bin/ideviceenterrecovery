@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "ideviceenterrecovery $@" >> "${FAKE_LOG:-/dev/null}"
+echo "Telling device with udid $1 to enter recovery mode."

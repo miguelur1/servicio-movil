@@ -16,6 +16,7 @@ const apps = require('./apps');
 const migration = require('./migrate');
 const deviceArt = require('./deviceart');
 const components = require('./components');
+const reset = require('./reset');
 const repair = require('./repair');
 const library = require('./library');
 const settings = require('./settings');
@@ -85,6 +86,13 @@ handle('device:analyzeLogs', (platform, serial, text) => (platform === 'ios' ? i
 handle('diag:components', (platform, serial) => (platform === 'ios' ? components.iosComponents(serial) : components.androidComponents(serial)));
 handle('diag:test', (serial, test, on) => components.androidTest(serial, test, on));
 handle('diag:factoryMenu', (manufacturer) => components.factoryMenu(manufacturer));
+handle('reset:check', (serial) => reset.androidCheck(serial));
+handle('reset:openScreen', (serial) => reset.androidOpenResetScreen(serial));
+handle('reset:openAccounts', (serial) => reset.androidOpenAccounts(serial));
+handle('reset:recovery', (serial) => reset.androidToRecovery(serial));
+handle('reset:fastbootState', (serial) => reset.fastbootUnlocked(serial));
+handle('reset:fastbootWipe', (serial, confirm) => reset.fastbootWipe(serial, confirm));
+handle('reset:iosRecovery', (udid, confirm) => reset.iosEnterRecovery(udid, confirm));
 handle('diag:battery', (platform, serial) => (platform === 'ios' ? diagnostics.iosBattery(serial) : diagnostics.androidBattery(serial)));
 const reportsDir = () => path.join(outDir(), 'Informes');
 /** Solo se actúa sobre PDF de la carpeta de informes. */

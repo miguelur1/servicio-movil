@@ -8,7 +8,7 @@ export MSYSTEM=UCRT64
 pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-libimobiledevice mingw-w64-ucrt-x86_64-ideviceinstaller >/dev/null
 DEST="resources/bin/libimobiledevice"
 rm -rf "$DEST"; mkdir -p "$DEST"
-TOOLS="idevice_id ideviceinfo idevicebackup2 idevicescreenshot idevicesyslog idevicepair idevicediagnostics idevicename ideviceimagemounter idevicecrashreport ideviceinstaller"
+TOOLS="idevice_id ideviceinfo idevicebackup2 idevicescreenshot idevicesyslog idevicepair idevicediagnostics idevicename ideviceimagemounter idevicecrashreport ideviceenterrecovery ideviceinstaller"
 for t in $TOOLS; do cp "/ucrt64/bin/$t.exe" "$DEST/"; done
 # Copia las DLL de MSYS2 que necesitan (las de Windows las trae el sistema).
 for t in $TOOLS; do

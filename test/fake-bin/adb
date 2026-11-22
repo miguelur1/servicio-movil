@@ -15,6 +15,11 @@ case "$*" in
   *"shell for f in cycle_count"*)
     if [ -n "$FAKE_NO_SYS" ]; then exit 0; fi
     printf 'cycle_count=412\ncharge_full=3891000\ncharge_full_design=4614000\n' ;;
+  *"dumpsys account"*) printf '    Account {name=cliente@gmail.com, type=com.google}\n    Account {name=cliente@gmail.com, type=com.google}\n    Account {name=x, type=com.whatsapp}\n' ;;
+  *"getprop sys.oem_unlock_allowed"*) printf '1\n1\n' ;;
+  *"FactoryResetActivity"*) if [ -n "$FAKE_NO_RESET_ACT" ]; then echo "Error: Activity class {com.android.settings/com.android.settings.Settings\$FactoryResetActivity} does not exist."; else echo "Starting: Intent { cmp=com.android.settings/.Settings\$FactoryResetActivity }"; fi ;;
+  *"ResetDashboardActivity"*) echo "Starting: Intent { cmp=com.android.settings/.Settings\$ResetDashboardActivity }" ;;
+  *"am start -a android.settings.SYNC_SETTINGS"*) echo "Starting: Intent { act=android.settings.SYNC_SETTINGS }" ;;
   "devices -l") printf 'List of devices attached\nR58M12ABCDE device usb:1-1 product:x model:SM_G973F device:beyond1 transport_id:3\n' ;;
   *"shell getprop") printf '[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-G973F]\n[ro.build.version.release]: [12]\n[ro.build.version.sdk]: [31]\n[ro.boot.flash.locked]: [1]\n' ;;
   *"shell dumpsys battery") printf '  level: 64\n  scale: 100\n  status: 3\n  health: 2\n  temperature: 305\n' ;;

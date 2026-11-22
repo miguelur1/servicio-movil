@@ -106,3 +106,6 @@ h5 { margin:12px 0 4px; font-size:13px; color:var(--muted); text-transform:upper
 .stepgrid .stepimgs img { width:100%; max-width:480px; cursor:zoom-in; } .stepgrid ul { margin:0; padding-left:18px; } .stepgrid li { margin:6px 0; }
 .tp { display:flex; gap:32px; flex-wrap:wrap; } .tp ul { margin:4px 0; padding-left:18px; }
 details.section > summary { cursor:pointer; }
+/* Restablecer */
+.danger-box { border:1px solid #7f1d1d; background:#2a1215; color:#fecaca; border-radius:8px; padding:10px 14px; margin:8px 0 12px; display:grid; gap:4px; }
+button.dangerbtn { background:var(--err); } input.confirm { flex:0 0 160px; min-width:0; }

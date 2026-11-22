@@ -1,7 +1,7 @@
 {
   "name": "servicio-movil",
   "productName": "MVR Servicio Móvil",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Herramienta de servicio técnico para Android e iPhone en Windows (ADB, Fastboot, libimobiledevice).",
   "main": "src/main/main.js",
   "author": "Miguel Velasco Rebollo",
