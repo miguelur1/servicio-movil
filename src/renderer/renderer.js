@@ -429,8 +429,20 @@ function mirrorTab(d, i, st) {
         el('li', {}, el('b', {}, 'Ctrl+V: '), 'pega en el móvil el texto copiado en el PC.'),
         el('li', {}, el('b', {}, 'Arrastrar un archivo a la ventana: '), 'un APK se instala; cualquier otro archivo se copia a la carpeta Download del móvil.'),
         el('li', {}, 'Para sacar fotos y archivos usa las pestañas «Fotos», «Archivos» y «Copia de seguridad» mientras tienes el espejo abierto.'))),
+    unlockSection(d, st),
     wifiSection(d, st),
     brokenScreenHelp(true));
+}
+
+function unlockSection(d, st) {
+  const pin = el('input', { type: 'password', class: 'search confirm', placeholder: 'PIN del cliente', autocomplete: 'off' });
+  const btn = actionButton('Desbloquear', async (b) => {
+    try { await st.run(b, () => window.api.mirrorEnterPin(d.serial, pin.value), () => 'PIN enviado. Si es correcto, en unos segundos verás el móvil desbloqueado.'); } finally { pin.value = ''; }
+  });
+  return section('Si el móvil está bloqueado (en el PC se ve negro)',
+    note('Android oculta la pantalla del PIN en cualquier captura por seguridad, por eso en el PC se ve negra. El móvil sí recibe lo que tecleas: escribe aquí el PIN o la contraseña que te da el cliente y la app lo introduce por ti. No se guarda.'),
+    el('div', { class: 'actions' }, pin, btn),
+    note('Si tiene patrón: dibújalo con el ratón en la ventana negra del espejo, en la zona central-baja, como si vieras la cuadrícula de 3×3. Al desbloquear ya se ve todo normal.'));
 }
 
 function wifiSection(d, st) {

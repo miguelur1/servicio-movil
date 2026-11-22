@@ -25,6 +25,8 @@ case "$*" in
   "connect "*) case "$2" in 10.9.9.9:*) echo "failed to connect to $2: Connection refused" ;; *) echo "connected to $2" ;; esac ;;
   "pair "*) if [ "$3" = "123456" ]; then echo "Successfully paired to $2 [guid=adb-XYZ]"; else echo "Failed: Wrong password or connection was dropped."; fi ;;
   "disconnect "*) echo "disconnected $2" ;;
+  *"shell wm size") echo "Physical size: 1080x2400" ;;
+  *"shell input "*) if [ -n "$FAKE_INPUT_FAIL" ]; then exit 1; fi ;;
   "devices -l") printf 'List of devices attached\nR58M12ABCDE device usb:1-1 product:x model:SM_G973F device:beyond1 transport_id:3\n' ;;
   *"shell getprop") printf '[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-G973F]\n[ro.build.version.release]: [12]\n[ro.build.version.sdk]: [31]\n[ro.boot.flash.locked]: [1]\n' ;;
   *"shell dumpsys battery") printf '  level: 64\n  scale: 100\n  status: 3\n  health: 2\n  temperature: 305\n' ;;

@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   wifiPair: (address, code) => ipcRenderer.invoke('wifi:pair', address, code),
   wifiDisconnect: (address) => ipcRenderer.invoke('wifi:disconnect', address),
   mirrorStart: (serial, opts) => ipcRenderer.invoke('mirror:start', serial, opts),
+  mirrorEnterPin: (serial, pin) => ipcRenderer.invoke('mirror:enterPin', serial, pin),
   mirrorStop: (serial) => ipcRenderer.invoke('mirror:stop', serial),
   mirrorStatus: (serial) => ipcRenderer.invoke('mirror:status', serial),
   mirrorOpenRecording: (file) => ipcRenderer.invoke('mirror:openRecording', file),

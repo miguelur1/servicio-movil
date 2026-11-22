@@ -62,4 +62,30 @@ function stop(serial) {
 
 const isRunning = (serial) => running.has(serial);
 
-module.exports = { buildArgs, explain, start, stop, isRunning };
+/**
+ * Introduce el PIN o la contraseña que da el cliente (con su permiso), como si se tecleara en el móvil.
+ * Android oculta la pantalla de bloqueo en las capturas (sale negra en el PC), pero sí acepta teclas.
+ * No se guarda ni se registra el PIN.
+ */
+const PIN_RE = /^[\x21-\x7e]{1,64}$/;
+async function enterPin(serial, pin) {
+  if (!PIN_RE.test(String(pin || ''))) throw new Error('Escribe el PIN o la contraseña del cliente (letras, números o símbolos, sin espacios)');
+  const sh = (cmd) => tools.run('adb', ['-s', serial, 'shell', cmd], { timeout: 15000 });
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  try {
+    await sh('input keyevent KEYCODE_WAKEUP');
+    await wait(400);
+    const m = String((await sh('wm size')).stdout).match(/(\d+)x(\d+)\s*$/m);
+    const [w, h] = m ? [Number(m[1]), Number(m[2])] : [1080, 2340];
+    await sh(`input swipe ${Math.round(w / 2)} ${Math.round(h * 0.85)} ${Math.round(w / 2)} ${Math.round(h * 0.25)} 250`);
+    await wait(700);
+    await sh(`input text ${tools.shq(String(pin))}`);
+    await sh('input keyevent KEYCODE_ENTER');
+  } catch {
+    // Sin detalles: el mensaje original incluiría el PIN.
+    throw new Error('No se pudo enviar el PIN al móvil. Comprueba la conexión.');
+  }
+  return true;
+}
+
+module.exports = { buildArgs, explain, start, stop, isRunning, enterPin };

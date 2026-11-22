@@ -99,6 +99,7 @@ handle('mirror:start', (serial, opts = {}) => {
     (e) => { if (win && !win.isDestroyed()) win.webContents.send('mirror:exit', e); }).then((state) => ({ state, record }));
 });
 handle('mirror:stop', (serial) => mirror.stop(serial));
+handle('mirror:enterPin', (serial, pin) => mirror.enterPin(serial, pin));
 handle('mirror:status', (serial) => mirror.isRunning(serial));
 handle('mirror:openRecording', (file) => {
   const f = path.resolve(String(file || ''));

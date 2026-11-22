@@ -37,3 +37,15 @@ test('start: arranca, usa nuestro adb y se puede cerrar', async () => {
   assert.strictEqual(mirror.isRunning('S3'), false);
   assert.ok(exited && exited.serial === 'S3');
 });
+
+test('enterPin: despierta, desliza, teclea el PIN y pulsa Intro', async () => {
+  fs.writeFileSync(process.env.FAKE_LOG, '');
+  assert.strictEqual(await mirror.enterPin('S4', "12'34"), true);
+  const log = fs.readFileSync(process.env.FAKE_LOG, 'utf8');
+  assert.match(log, /-s S4 shell input keyevent KEYCODE_WAKEUP\n-s S4 shell wm size\n-s S4 shell input swipe 540 2040 540 600 250\n-s S4 shell input text '12'\\''34'\n-s S4 shell input keyevent KEYCODE_ENTER/);
+  await assert.rejects(mirror.enterPin('S4', '12 34'), /sin espacios/);
+  process.env.FAKE_INPUT_FAIL = '1';
+  try {
+    await assert.rejects(mirror.enterPin('S4', '987654'), (e) => !e.message.includes('987654') && /No se pudo enviar/.test(e.message));
+  } finally { delete process.env.FAKE_INPUT_FAIL; }
+});
